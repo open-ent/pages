@@ -1,1 +1,6 @@
-{}
+{
+  "pages": "Pages",
+  "pages.push.notif.shared": "Pages: A page has been shared with you",
+  "pages.shared": "Sharing of a Page",
+  "timeline.page.has.shared": "shared the page with you"
+}
