@@ -85,7 +85,17 @@ public class PagesController extends MongoDbControllerHelper {
 	@ApiDoc("Get page view")
 	@SecuredAction("pages.view")
 	public void view(HttpServerRequest request) {
-		renderView(request);
+		// IHM React (CCTP 51C — migration) : défaut piloté par la conf `frontend-ui` (react|angular,
+		// défaut angular), override par `?ui=react|angular`. pages-react.html = nouvelle IHM React.
+		// NB : la génération springboard retire les clés de conf inconnues → c'est ce défaut Java qui pilote.
+		final String uiParam = request.params().get("ui");
+		final String frontendUi = "react".equals(this.config.getString("frontend-ui", "angular")) ? "react" : "angular";
+		final String ui = ("react".equals(uiParam) || "angular".equals(uiParam)) ? uiParam : frontendUi;
+		if ("react".equals(ui)) {
+			renderView(request, new io.vertx.core.json.JsonObject(), "pages-react.html", null);
+		} else {
+			renderView(request);
+		}
 		eventHelper.onAccess(request);
 	}
 
