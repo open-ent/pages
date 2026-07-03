@@ -35,6 +35,7 @@
                             <opt ng-click="page.publish(); updateNav();" ng-if="!page.published"><i18n>publish</i18n></opt>
                             <opt ng-click="website.showStyle = page"><i18n>page.editstyle</i18n></opt>
                             <opt ng-click="page.show.rename = true"><i18n>rename</i18n></opt>
+                            <opt ng-if="canManageRights(page)" ng-click="openPageRights(page)"><i18n>pages.rights.manage</i18n></opt>
                         </dots-menu>
                     </div>
                 </li>
@@ -83,5 +84,29 @@
     <div class="row">
         <button class="right-magnet" ng-click="removePage(); updateNav();"><i18n>remove</i18n></button>
         <button class="cancel right-magnet" ng-click="lightbox('confirmRemovePage')"><i18n>cancel</i18n></button>
+    </div>
+</lightbox>
+
+<!-- CCTP 58B — Droits de modification par page -->
+<lightbox show="display.lightbox.pageRights" on-close="closeLightbox('pageRights')">
+    <h2><i18n>pages.rights.manage</i18n></h2>
+    <p class="info"><i18n>pages.rights.help</i18n> <strong>[[pageRights.page.title]]</strong></p>
+    <div ng-if="pageRights.loading" class="row"><i18n>loading</i18n></div>
+    <div ng-if="!pageRights.loading">
+        <p ng-if="pageRights.entries.length === 0"><i18n>pages.rights.noshare</i18n></p>
+        <ul class="twelve list-view" ng-if="pageRights.entries.length > 0">
+            <li ng-repeat="entry in pageRights.entries">
+                <label class="twelve cell">
+                    <input type="checkbox" ng-model="entry.checked" />
+                    <i class="[[entry.type === 'group' ? 'group' : 'user']]"></i>
+                    [[entry.name]]
+                </label>
+            </li>
+        </ul>
+        <p class="info"><i18n>pages.rights.empty.means.all</i18n></p>
+        <div class="row">
+            <button class="right-magnet" ng-click="savePageRights()"><i18n>save</i18n></button>
+            <button class="cancel right-magnet" ng-click="closeLightbox('pageRights')"><i18n>cancel</i18n></button>
+        </div>
     </div>
 </lightbox>

@@ -1,9 +1,10 @@
-import { ng, sniplets, Behaviours } from 'entcore';
+import { ng, sniplets, Behaviours, notify } from 'entcore';
 import { template, idiom } from 'entcore';
 import { Website, Cell, Page, Folders, Media, Rows, Blocks, Block } from '../model';
 import { _ } from 'entcore';
 import { Autosave } from 'entcore-toolkit';
 import { $ } from 'entcore';
+import http from 'axios';
 
 export let edit = ng.controller('EditController', [
     '$scope', 'model', 'route', '$route', '$location', function ($scope, model, route, $route, $location) {
@@ -158,6 +159,64 @@ export let edit = ng.controller('EditController', [
             $scope.closeLightbox('managePages');
             $scope.website.newPage = undefined;
             $scope.website.showStyle = undefined;
+        };
+
+        // ─── CCTP 58B — Droits de modification par page ──────────────────────────
+        // Restreint, page par page, les groupes/utilisateurs partagés du site autorisés
+        // à modifier une page donnée. Vide = tous les contributeurs du site (comportement
+        // historique).
+        $scope.pageRights = { page: undefined, entries: [], loading: false };
+
+        $scope.canManageRights = (page: Page) => {
+            let isOwner = ($scope.website && $scope.website.owner && $scope.website.owner.userId === model.me.userId)
+                || model.me.userId === page.owner;
+            return isOwner || model.me.hasRight($scope.website, Behaviours.applicationsBehaviours.pages.rights.resource.manager);
+        };
+
+        $scope.openPageRights = async (page: Page) => {
+            $scope.pageRights = { page: page, entries: [], loading: true };
+            $scope.lightbox('pageRights');
+            try {
+                const res = await http.get('/pages/share/json/' + $scope.website._id);
+                const data = res.data || {};
+                const selected = page.contrib || [];
+                const entries = [];
+                const groups = (data.groups && data.groups.visibles) || [];
+                const gChecked = (data.groups && data.groups.checked) || {};
+                groups.forEach((g) => {
+                    if (gChecked[g.id]) {
+                        entries.push({ id: g.id, name: g.name, type: 'group', checked: selected.indexOf(g.id) !== -1 });
+                    }
+                });
+                const users = (data.users && data.users.visibles) || [];
+                const uChecked = (data.users && data.users.checked) || {};
+                users.forEach((u) => {
+                    if (uChecked[u.id]) {
+                        const name = u.username || ((u.firstName || '') + ' ' + (u.lastName || '')).trim();
+                        entries.push({ id: u.id, name: name, type: 'user', checked: selected.indexOf(u.id) !== -1 });
+                    }
+                });
+                $scope.pageRights.entries = entries;
+            } catch (e) {
+                notify.error('pages.rights.load.error');
+            }
+            $scope.pageRights.loading = false;
+            $scope.$apply();
+        };
+
+        $scope.savePageRights = async () => {
+            const page: Page = $scope.pageRights.page;
+            if (!page) { return; }
+            const contrib = $scope.pageRights.entries.filter((e) => e.checked).map((e) => e.id);
+            try {
+                await http.put('/pages/' + $scope.website._id + '/page/' + page.titleLink + '/rights', { contrib: contrib });
+                page.contrib = contrib;
+                notify.info('pages.rights.saved');
+            } catch (e) {
+                notify.error('pages.rights.save.error');
+            }
+            $scope.closeLightbox('pageRights');
+            $scope.$apply();
         };
 
         $scope.closeCellTitle = (save: boolean) => {

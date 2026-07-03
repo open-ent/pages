@@ -134,16 +134,117 @@ public class PagesController extends MongoDbControllerHelper {
 	protected void doUpdate(final HttpServerRequest request) {
 		UserUtils.getUserInfos(this.eb, request, user -> {
 			if (user != null) {
-				RequestUtils.bodyToJson(request, object -> {
-					String id = request.params().get("id");
-					object = beforeSave(object);
-					crudService.update(id, object, user, DefaultResponseHandler.notEmptyResponseHandler(request));
+				RequestUtils.bodyToJson(request, body -> {
+					final String id = request.params().get("id");
+					final JsonObject object = beforeSave(body);
+					// CCTP 58B — droits de modification par page : avant d'écrire le site, on
+					// recharge la version existante pour empêcher un contributeur de modifier une
+					// page verrouillée à un autre groupe (les pages protégées sont préservées).
+					mongo.findOne(PAGES_COLLECTION, MongoQueryBuilder.build(Filters.eq("_id", id)), event -> {
+						Either<String, JsonObject> existing = Utils.validResult(event);
+						if (existing.isRight() && existing.right().getValue() != null
+								&& !existing.right().getValue().isEmpty()) {
+							enforcePerPageRights(existing.right().getValue(), object, user);
+						}
+						crudService.update(id, object, user, DefaultResponseHandler.notEmptyResponseHandler(request));
+					});
 				});
 			} else {
 				ControllerHelper.log.debug("User not found in session.");
 				Renders.unauthorized(request);
 			}
 		});
+	}
+
+	/**
+	 * CCTP 58B — Applique les droits de modification par page.
+	 *
+	 * Une page embarquée peut porter un tableau {@code contrib} : la liste des groupes/utilisateurs
+	 * autorisés à la modifier. Le propriétaire du site conserve tous les droits ; pour les autres
+	 * contributeurs, toute page protégée qu'ils ne sont pas autorisés à modifier est restaurée dans
+	 * son état existant (contenu + droits), ce qui empêche son écrasement ou sa suppression.
+	 *
+	 * @param existing document du site tel qu'enregistré
+	 * @param incoming document du site soumis (modifié en place)
+	 * @param user     utilisateur à l'origine de la mise à jour
+	 */
+	private void enforcePerPageRights(JsonObject existing, JsonObject incoming, UserInfos user) {
+		// Le propriétaire du site n'est pas restreint.
+		JsonObject siteOwner = existing.getJsonObject("owner");
+		if (siteOwner != null && user.getUserId().equals(siteOwner.getString("userId"))) {
+			return;
+		}
+		JsonArray existingPages = existing.getJsonArray("pages");
+		JsonArray incomingPages = incoming.getJsonArray("pages");
+		if (existingPages == null) {
+			return;
+		}
+		// Identités autorisées de l'utilisateur : son id + ses groupes.
+		Set<String> identities = new HashSet<>();
+		identities.add(user.getUserId());
+		if (user.getGroupsIds() != null) {
+			identities.addAll(user.getGroupsIds());
+		}
+		// Index des pages existantes par identifiant de page (titleLink, unique dans le site).
+		Map<String, JsonObject> existingByLink = new HashMap<>();
+		for (int i = 0; i < existingPages.size(); i++) {
+			JsonObject p = existingPages.getJsonObject(i);
+			if (p != null && p.getString("titleLink") != null) {
+				existingByLink.put(p.getString("titleLink"), p);
+			}
+		}
+		final JsonArray result = new JsonArray();
+		final Set<String> keptLinks = new HashSet<>();
+		if (incomingPages != null) {
+			for (int i = 0; i < incomingPages.size(); i++) {
+				JsonObject incomingPage = incomingPages.getJsonObject(i);
+				if (incomingPage == null) {
+					continue;
+				}
+				String link = incomingPage.getString("titleLink");
+				JsonObject existingPage = link != null ? existingByLink.get(link) : null;
+				if (existingPage != null && !mayEditPage(existingPage, user, identities)) {
+					// Page verrouillée pour cet utilisateur : on conserve la version existante.
+					result.add(existingPage.copy());
+				} else {
+					// Page modifiable : on garde la version soumise mais les droits par page
+					// ne se modifient que via la route dédiée, jamais par la sauvegarde du site.
+					if (existingPage != null && existingPage.containsKey("contrib")) {
+						incomingPage.put("contrib", existingPage.getJsonArray("contrib"));
+					}
+					result.add(incomingPage);
+				}
+				if (link != null) {
+					keptLinks.add(link);
+				}
+			}
+		}
+		// Restaure les pages protégées supprimées côté client par un contributeur non autorisé.
+		for (Map.Entry<String, JsonObject> e : existingByLink.entrySet()) {
+			if (!keptLinks.contains(e.getKey()) && !mayEditPage(e.getValue(), user, identities)) {
+				result.add(e.getValue().copy());
+			}
+		}
+		incoming.put("pages", result);
+	}
+
+	/** Indique si l'utilisateur peut modifier la page protégée donnée (propriétaire ou dans {@code contrib}). */
+	private boolean mayEditPage(JsonObject page, UserInfos user, Set<String> identities) {
+		JsonArray contrib = page.getJsonArray("contrib");
+		// Pas de droits par page définis → comportement historique (droit au niveau site).
+		if (contrib == null || contrib.isEmpty()) {
+			return true;
+		}
+		// Propriétaire de la page.
+		if (user.getUserId().equals(page.getString("owner"))) {
+			return true;
+		}
+		for (int i = 0; i < contrib.size(); i++) {
+			if (identities.contains(contrib.getString(i))) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Post("")
@@ -201,6 +302,76 @@ public class PagesController extends MongoDbControllerHelper {
 	@SecuredAction(value = "page.manager", type = ActionType.RESOURCE)
 	public void delete(HttpServerRequest request) {
 		super.delete(request);
+	}
+
+	@Get("/:id/page/:pageLink/rights")
+	@ApiDoc("Get per-page edit rights (CCTP 58B).")
+	@ResourceFilter(PageReadFilter.class)
+	@SecuredAction(value = "page.read", type = ActionType.RESOURCE)
+	public void getPageRights(HttpServerRequest request) {
+		final String id = request.params().get("id");
+		final String pageLink = request.params().get("pageLink");
+		mongo.findOne(PAGES_COLLECTION, MongoQueryBuilder.build(Filters.eq("_id", id)), event -> {
+			Either<String, JsonObject> res = Utils.validResult(event);
+			if (res.isRight() && res.right().getValue() != null && !res.right().getValue().isEmpty()) {
+				JsonArray pages = res.right().getValue().getJsonArray("pages", new JsonArray());
+				for (int i = 0; i < pages.size(); i++) {
+					JsonObject p = pages.getJsonObject(i);
+					if (p != null && pageLink != null && pageLink.equals(p.getString("titleLink"))) {
+						renderJson(request, new JsonObject().put("contrib",
+								p.getJsonArray("contrib", new JsonArray())));
+						return;
+					}
+				}
+				notFound(request, "page.not.found");
+			} else {
+				notFound(request);
+			}
+		});
+	}
+
+	@Put("/:id/page/:pageLink/rights")
+	@ApiDoc("Set per-page edit rights (CCTP 58B) — restricts who may modify a given embedded page.")
+	@SecuredAction(value = "page.manager", type = ActionType.RESOURCE)
+	public void setPageRights(final HttpServerRequest request) {
+		final String id = request.params().get("id");
+		final String pageLink = request.params().get("pageLink");
+		RequestUtils.bodyToJson(request, body -> {
+			final JsonArray contrib = body.getJsonArray("contrib", new JsonArray());
+			mongo.findOne(PAGES_COLLECTION, MongoQueryBuilder.build(Filters.eq("_id", id)), event -> {
+				Either<String, JsonObject> res = Utils.validResult(event);
+				if (res.isRight() && res.right().getValue() != null && !res.right().getValue().isEmpty()) {
+					JsonObject site = res.right().getValue();
+					JsonArray pages = site.getJsonArray("pages", new JsonArray());
+					boolean found = false;
+					for (int i = 0; i < pages.size(); i++) {
+						JsonObject p = pages.getJsonObject(i);
+						if (p != null && pageLink != null && pageLink.equals(p.getString("titleLink"))) {
+							p.put("contrib", contrib);
+							found = true;
+							break;
+						}
+					}
+					if (!found) {
+						notFound(request, "page.not.found");
+						return;
+					}
+					JsonObject modifier = new JsonObject().put("$set",
+							new JsonObject().put("pages", pages));
+					mongo.update(PAGES_COLLECTION, MongoQueryBuilder.build(Filters.eq("_id", id)), modifier,
+							message -> {
+								JsonObject r = message.body();
+								if ("ok".equals(r.getString("status"))) {
+									renderJson(request, new JsonObject().put("contrib", contrib));
+								} else {
+									renderError(request, r);
+								}
+							});
+				} else {
+					notFound(request);
+				}
+			});
+		});
 	}
 
 	@Get("/pub/:id")

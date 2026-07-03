@@ -187,5 +187,12 @@
   "wizard.template.title": "Select a page template",
   "wizard.type.private": "Create a private site",
   "wizard.type.public": "Create a public site",
-  "wizard.type.title": "What type of site do you want to create?"
+  "wizard.type.title": "What type of site do you want to create?",
+  "pages.rights.manage": "Page rights",
+  "pages.rights.help": "Groups and people allowed to edit the page",
+  "pages.rights.noshare": "This site is not shared with anyone. Share the site first to restrict per-page rights.",
+  "pages.rights.empty.means.all": "If no box is checked, every site contributor may edit this page.",
+  "pages.rights.saved": "Page rights saved.",
+  "pages.rights.load.error": "Unable to load page rights.",
+  "pages.rights.save.error": "Failed to save page rights."
 }
