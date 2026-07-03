@@ -13,6 +13,6 @@
         "userbook-host": "${host}",
         "integration-mode" : "HTTP",
         "mode" : "${mode}",
-        "frontend-ui" : "angular"
+        "frontend-ui" : "react"
       }
     }

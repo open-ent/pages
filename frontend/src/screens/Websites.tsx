@@ -4,11 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { api, Website } from '../api';
+import { ShareDialog } from './ShareDialog';
 
-/** Accueil : liste des sites web + création / suppression. */
+/** Accueil : liste des sites web + création / suppression / partage. */
 export function Websites() {
   const { t } = useTranslation(['pages', 'common']);
   const qc = useQueryClient();
+  const [sharing, setSharing] = useState<{ id: string; name: string } | null>(null);
   const query = useQuery({ queryKey: ['pages', 'list'], queryFn: api.getWebsites });
   const invalidate = () => qc.invalidateQueries({ queryKey: ['pages', 'list'] });
 
@@ -39,6 +41,16 @@ export function Websites() {
 
   return (
     <div>
+      {sharing && (
+        <ShareDialog
+          resourceId={sharing.id}
+          resourceName={sharing.name}
+          title={t('pages.share.title', { defaultValue: 'Partager le site' })}
+          getShare={api.getWebsiteShare}
+          shareBatch={api.shareWebsiteBatch}
+          onClose={() => setSharing(null)}
+        />
+      )}
       <div className="d-flex align-items-center justify-content-between mb-16">
         <h1 className="m-0">{t('pages.title', { defaultValue: 'Sites web' })}</h1>
         {!creating && (
@@ -78,15 +90,20 @@ export function Websites() {
               <Link to={`/site/${w._id}`} className="fw-bold" style={{ fontSize: 17 }}>{w.title}</Link>
               {w.description && <div className="text-muted" style={{ fontSize: 13 }}>{w.description}</div>}
             </div>
-            <button
-              type="button"
-              className="btn btn-link p-0 text-danger"
-              onClick={() => {
-                if (window.confirm(t('pages.confirm.delete', { defaultValue: 'Supprimer ce site et ses pages ?' }))) deleteMut.mutate(w._id);
-              }}
-            >
-              {t('pages.delete', { defaultValue: 'Supprimer' })}
-            </button>
+            <div className="d-flex gap-8">
+              <button type="button" className="btn btn-link p-0" onClick={() => setSharing({ id: w._id, name: w.title })}>
+                {t('pages.share', { defaultValue: 'Partager' })}
+              </button>
+              <button
+                type="button"
+                className="btn btn-link p-0 text-danger"
+                onClick={() => {
+                  if (window.confirm(t('pages.confirm.delete', { defaultValue: 'Supprimer ce site et ses pages ?' }))) deleteMut.mutate(w._id);
+                }}
+              >
+                {t('pages.delete', { defaultValue: 'Supprimer' })}
+              </button>
+            </div>
           </li>
         ))}
       </ul>
