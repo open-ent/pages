@@ -14,6 +14,9 @@ export interface Website {
   description?: string;
   pages?: Page[];
   owner?: { userId: string; displayName: string };
+  /** Dates Mongo au format {$date: ISO}. */
+  modified?: { $date: string };
+  created?: { $date: string };
 }
 
 // ── Partage (modèle entcore batch) ───────────────────────────────────────────

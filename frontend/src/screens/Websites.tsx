@@ -37,7 +37,14 @@ export function Websites() {
     if (title.trim()) createMut.mutate();
   };
 
-  const websites = query.data ?? [];
+  // Recherche (parité Angular) : filtre sur le titre et la description.
+  const [search, setSearch] = useState('');
+  const norm = (s: string) => s.toLocaleLowerCase('fr-FR');
+  const websites = (query.data ?? []).filter(
+    (w) => !search.trim() || norm(`${w.title} ${w.description ?? ''}`).includes(norm(search.trim())),
+  );
+
+  const dateFr = (d?: { $date: string }) => (d?.$date ? new Date(d.$date).toLocaleDateString('fr-FR') : '');
 
   return (
     <div>
@@ -77,6 +84,17 @@ export function Websites() {
         </form>
       )}
 
+      <div className="mb-16" style={{ maxWidth: 360 }}>
+        <input
+          type="search"
+          className="form-control"
+          placeholder={t('pages.search', { defaultValue: 'Rechercher un site…' })}
+          aria-label={t('pages.search', { defaultValue: 'Rechercher un site…' })}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       {query.isLoading && <p>{t('pages.loading', { defaultValue: 'Chargement…' })}</p>}
       {query.isError && <div className="alert alert-warning" role="alert">{t('pages.error', { defaultValue: 'Une erreur est survenue.' })}</div>}
       {!query.isLoading && websites.length === 0 && (
@@ -89,6 +107,10 @@ export function Websites() {
             <div>
               <Link to={`/site/${w._id}`} className="fw-bold" style={{ fontSize: 17 }}>{w.title}</Link>
               {w.description && <div className="text-muted" style={{ fontSize: 13 }}>{w.description}</div>}
+              <div className="text-muted" style={{ fontSize: 12 }}>
+                {w.owner?.displayName && <>{t('pages.by', { defaultValue: 'Par' })} {w.owner.displayName}</>}
+                {dateFr(w.modified) && <> · {t('pages.modified', { defaultValue: 'Modifié le' })} {dateFr(w.modified)}</>}
+              </div>
             </div>
             <div className="d-flex gap-8">
               <button type="button" className="btn btn-link p-0" onClick={() => setSharing({ id: w._id, name: w.title })}>
