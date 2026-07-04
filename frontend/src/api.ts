@@ -17,6 +17,20 @@ export interface Website {
   /** Dates Mongo au format {$date: ISO}. */
   modified?: { $date: string };
   created?: { $date: string };
+  /** Corbeille : site mis de côté (restaurable), cf. modèle Angular. */
+  trashed?: boolean;
+}
+
+/** Dossier de rangement des sites (collection pagesFolders). */
+export interface Folder {
+  _id: string;
+  name: string;
+  /** 'root' ou _id du dossier parent. */
+  parentId?: string;
+  trashed?: boolean;
+  /** Sites rangés dans ce dossier. */
+  websitesIds?: string[];
+  owner?: { userId: string; displayName: string };
 }
 
 // ── Partage (modèle entcore batch) ───────────────────────────────────────────
@@ -69,9 +83,34 @@ export const createWebsite = async (data: { title: string; description?: string 
 /** Met à jour un site (métadonnées et/ou tableau de pages embarquées). */
 export const updateWebsite = async (
   id: string,
-  data: { title: string; description?: string; pages?: Page[] },
+  data: { title?: string; description?: string; pages?: Page[]; trashed?: boolean },
 ): Promise<unknown> =>
   json<unknown>(await fetch(`/pages/${id}`, { ...base, method: 'PUT', headers: mutHeaders(), body: JSON.stringify(data) }));
+
+/** Corbeille : bascule le drapeau `trashed` du site (PUT partiel, $set Mongo). */
+export const setWebsiteTrashed = async (id: string, trashed: boolean): Promise<void> => {
+  await updateWebsite(id, { trashed });
+};
+
+// ── Dossiers (rangement des sites) ────────────────────────────────────────────
+export const getFolders = async (): Promise<Folder[]> =>
+  json<Folder[]>(await fetch('/pages/folder/list/all', base)).catch(() => []);
+
+export const createFolder = async (name: string, parentId = 'root'): Promise<void> => {
+  const body = { name, parentId, trashed: false, websitesIds: [] };
+  const res = await fetch('/pages/folder', { ...base, method: 'POST', headers: mutHeaders(), body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(String(res.status));
+};
+
+export const updateFolder = async (id: string, data: Partial<Folder>): Promise<void> => {
+  const res = await fetch(`/pages/folder/${id}`, { ...base, method: 'PUT', headers: mutHeaders(), body: JSON.stringify(data) });
+  if (!res.ok) throw new Error(String(res.status));
+};
+
+export const deleteFolder = async (id: string): Promise<void> => {
+  const res = await fetch(`/pages/folder/${id}`, { ...base, method: 'DELETE', headers: xsrfHeader() });
+  if (!res.ok && res.status !== 204) throw new Error(String(res.status));
+};
 
 export const deleteWebsite = async (id: string): Promise<void> => {
   const res = await fetch(`/pages/${id}`, { ...base, method: 'DELETE', headers: xsrfHeader() });
@@ -94,5 +133,10 @@ export const api = {
   shareWebsiteBatch,
   createWebsite,
   updateWebsite,
+  setWebsiteTrashed,
+  getFolders,
+  createFolder,
+  updateFolder,
+  deleteFolder,
   deleteWebsite,
 };
