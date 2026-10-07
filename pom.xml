@@ -35,7 +35,7 @@
 
     <properties><!-- Reporter les versions des dépendances de gradle.properties -->
         <entcore.version>6.16.14-patched</entcore.version>
-        <entCoreLibsVersion>6.16.7-patched</entCoreLibsVersion>
+        <entCoreLibsVersion>6.16.8-patched</entCoreLibsVersion>
         <mongodb-helper.version>3.1.1</mongodb-helper.version>
     </properties>
 
