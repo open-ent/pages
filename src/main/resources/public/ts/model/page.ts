@@ -24,6 +24,9 @@ export class Page implements Selectable {
     sass: string;
     hasGrids: boolean;
     owner: string;
+    // CCTP 58B — droits de modification par page : ids des groupes/utilisateurs
+    // autorisés à modifier cette page. Vide/absent = droit au niveau du site.
+    contrib: string[];
 
     constructor(pageName?: string) {
         if (pageName && typeof pageName === 'string') {
@@ -65,6 +68,8 @@ export class Page implements Selectable {
         if (page.published === undefined) {
             this.published = true;
         }
+        // CCTP 58B — droits de modification par page.
+        this.contrib = Array.isArray(page.contrib) ? page.contrib : [];
     }
 
     toJSON() {
@@ -76,7 +81,8 @@ export class Page implements Selectable {
             index: this.index,
             published: this.published,
             sass: this.sass,
-            owner: this.owner
+            owner: this.owner,
+            contrib: this.contrib || []
         }
     }
 
