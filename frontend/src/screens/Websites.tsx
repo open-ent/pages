@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { api, Website } from '../api';
+import { dateLocale } from '../locale';
 import { ShareDialog } from './ShareDialog';
 
 /** Accueil : liste des sites web + création / dossiers / corbeille / partage. */
@@ -77,7 +78,7 @@ export function Websites() {
 
   // Recherche (parité Angular) : filtre sur le titre et la description.
   const [search, setSearch] = useState('');
-  const norm = (s: string) => s.toLocaleLowerCase('fr-FR');
+  const norm = (s: string) => s.toLocaleLowerCase(dateLocale());
   const websites = (query.data ?? [])
     .filter((w) => {
       if (currentFolderId === 'trash') return Boolean(w.trashed);
@@ -87,7 +88,8 @@ export function Websites() {
     })
     .filter((w) => !search.trim() || norm(`${w.title} ${w.description ?? ''}`).includes(norm(search.trim())));
 
-  const dateFr = (d?: { $date: string }) => (d?.$date ? new Date(d.$date).toLocaleDateString('fr-FR') : '');
+  const formatDate = (d?: { $date: string }) =>
+    d?.$date ? new Date(d.$date).toLocaleDateString(dateLocale()) : '';
 
   return (
     <div>
@@ -215,7 +217,7 @@ export function Websites() {
               {w.description && <div className="text-muted" style={{ fontSize: 13 }}>{w.description}</div>}
               <div className="text-muted" style={{ fontSize: 12 }}>
                 {w.owner?.displayName && <>{t('pages.by', { defaultValue: 'Par' })} {w.owner.displayName}</>}
-                {dateFr(w.modified) && <> · {t('pages.modified', { defaultValue: 'Modifié le' })} {dateFr(w.modified)}</>}
+                {formatDate(w.modified) && <> · {t('pages.modified', { defaultValue: 'Modifié le' })} {formatDate(w.modified)}</>}
               </div>
             </div>
             <div className="d-flex gap-8 align-items-center">
