@@ -4,7 +4,14 @@
 /** Une page d'un site (contenu HTML embarqué dans le document du site). */
 export interface Page {
   title: string;
-  content: string;
+  content?: string;
+  /** Lien (slug) de la page, utilisé par la navigation et le site public. */
+  titleLink?: string;
+  /** Grille de mise en page créée par l'éditeur AngularJS : le React ne sait pas la modifier. */
+  rows?: unknown[];
+  published?: boolean;
+  index?: number;
+  [extra: string]: unknown;
 }
 
 /** Un site web : métadonnées + tableau de pages embarquées. */
@@ -77,8 +84,20 @@ export const getWebsites = async (): Promise<Website[]> =>
 export const getWebsite = async (id: string): Promise<Website> =>
   json<Website>(await fetch(`/pages/${id}`, base));
 
-export const createWebsite = async (data: { title: string; description?: string }): Promise<Website> =>
-  json<Website>(await fetch('/pages/p', { ...base, method: 'POST', headers: mutHeaders(), body: JSON.stringify(data) }));
+/**
+ * Crée un site. Route selon la visibilité, comme l'AngularJS : un site PRIVÉ passe par `POST /pages` (droit
+ * `pages.add`), un site PUBLIC par `POST /pages/p` (droit `pages.add.public`) — tout envoyer sur `/pages/p`
+ * refusait la création aux utilisateurs qui n'ont que `pages.add`.
+ */
+export const createWebsite = async (data: { title: string; description?: string; visibility?: 'PRIVATE' | 'PUBLIC' }): Promise<Website> =>
+  json<Website>(
+    await fetch(data.visibility === 'PUBLIC' ? '/pages/p' : '/pages', {
+      ...base,
+      method: 'POST',
+      headers: mutHeaders(),
+      body: JSON.stringify(data),
+    }),
+  );
 
 /** Met à jour un site (métadonnées et/ou tableau de pages embarquées). */
 export const updateWebsite = async (
@@ -94,7 +113,7 @@ export const setWebsiteTrashed = async (id: string, trashed: boolean): Promise<v
 
 // ── Dossiers (rangement des sites) ────────────────────────────────────────────
 export const getFolders = async (): Promise<Folder[]> =>
-  json<Folder[]>(await fetch('/pages/folder/list/all', base)).catch(() => []);
+  json<Folder[]>(await fetch('/pages/folder/list/all', base));
 
 export const createFolder = async (name: string, parentId = 'root'): Promise<void> => {
   const body = { name, parentId, trashed: false, websitesIds: [] };

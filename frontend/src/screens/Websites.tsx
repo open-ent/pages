@@ -1,3 +1,4 @@
+import { useHasWorkflow } from '@open-ent/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,11 +55,16 @@ export function Websites() {
   });
 
   const [creating, setCreating] = useState(false);
+  // Droits de création : privé = `pages.add`, public = `pages.add.public` (routes différentes côté serveur).
+  const canAddPrivate = useHasWorkflow('fr.wseduc.pages.controllers.PagesController|add') === true;
+  const canAddPublic = useHasWorkflow('fr.wseduc.pages.controllers.PagesController|addPublic') === true;
+  const [visibility, setVisibility] = useState<'PRIVATE' | 'PUBLIC'>('PRIVATE');
+  const effectiveVisibility = visibility === 'PRIVATE' && !canAddPrivate && canAddPublic ? 'PUBLIC' : visibility;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 
   const createMut = useMutation({
-    mutationFn: () => api.createWebsite({ title: title.trim(), description: description.trim() }),
+    mutationFn: () => api.createWebsite({ title: title.trim(), description: description.trim(), visibility: effectiveVisibility }),
     onSuccess: () => {
       setTitle('');
       setDescription('');
@@ -105,7 +111,7 @@ export function Websites() {
       )}
       <div className="d-flex align-items-center justify-content-between mb-16">
         <h1 className="m-0">{t('pages.title', { defaultValue: 'Sites web' })}</h1>
-        {!creating && (
+        {!creating && (canAddPrivate || canAddPublic) && (
           <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
             {t('pages.new', { defaultValue: 'Nouveau site' })}
           </button>
@@ -122,6 +128,15 @@ export function Websites() {
             <label htmlFor="site-desc" className="form-label">{t('pages.description', { defaultValue: 'Description' })}</label>
             <input id="site-desc" type="text" className="form-control" value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
+          {canAddPrivate && canAddPublic && (
+            <div className="mb-8">
+              <label htmlFor="site-visibility" className="form-label">{t('pages.visibility', { defaultValue: 'Type de site' })}</label>
+              <select id="site-visibility" className="form-select" value={visibility} onChange={(e) => setVisibility(e.target.value as 'PRIVATE' | 'PUBLIC')}>
+                <option value="PRIVATE">{t('pages.visibility.private', { defaultValue: 'Privé (interne à la plateforme)' })}</option>
+                <option value="PUBLIC">{t('pages.visibility.public', { defaultValue: 'Public (accessible sans connexion)' })}</option>
+              </select>
+            </div>
+          )}
           <div className="d-flex gap-8">
             <button type="submit" className="btn btn-primary" disabled={!title.trim() || createMut.isPending}>{t('pages.create', { defaultValue: 'Créer' })}</button>
             <button type="button" className="btn btn-secondary" onClick={() => setCreating(false)}>{t('pages.cancel', { defaultValue: 'Annuler' })}</button>
@@ -204,6 +219,11 @@ export function Websites() {
       </div>
 
       {query.isLoading && <p>{t('pages.loading', { defaultValue: 'Chargement…' })}</p>}
+      {(createMut.isError || trashMut.isError || moveMut.isError || deleteMut.isError || deleteFolderMut.isError || createFolderMut.isError || foldersQuery.isError) && (
+        <div className="alert alert-warning" role="alert" data-pages-error>
+          {t('pages.error.forbidden', { defaultValue: "L'action a échoué (droit insuffisant ou erreur du serveur)." })}
+        </div>
+      )}
       {query.isError && <div className="alert alert-warning" role="alert">{t('pages.error', { defaultValue: 'Une erreur est survenue.' })}</div>}
       {!query.isLoading && websites.length === 0 && (
         <p className="text-muted">{t('pages.empty', { defaultValue: 'Aucun site. Créez-en un.' })}</p>

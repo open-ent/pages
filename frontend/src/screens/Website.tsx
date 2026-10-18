@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
 import { api, Page } from '../api';
-import { pagePreview } from '../utils';
+import { isGridPage, pagePreview, slugify } from '../utils';
 
 /** Détail d'un site : gestion des pages embarquées (ajout / édition / suppression). */
 export function Website() {
@@ -30,8 +30,12 @@ export function Website() {
 
   const saveMut = useMutation({
     mutationFn: () => {
-      const page: Page = { title: title.trim(), content };
-      const next = editingIdx === null ? [...pages, page] : pages.map((p, i) => (i === editingIdx ? page : p));
+      // Édition : on fusionne dans la page existante pour ne perdre aucun champ (titleLink, published, style…) ;
+      // création : champs attendus par la navigation et l'éditeur AngularJS (lien, grille vide, publiée).
+      const next =
+        editingIdx === null
+          ? [...pages, { title: title.trim(), content, titleLink: slugify(title.trim()), rows: [], published: true, index: pages.length } as Page]
+          : pages.map((p, i) => (i === editingIdx ? { ...p, title: title.trim(), content } : p));
       return putPages(next);
     },
     onSuccess: () => {
@@ -46,6 +50,7 @@ export function Website() {
   const deleteMut = useMutation({
     mutationFn: (idx: number) => putPages(pages.filter((_, i) => i !== idx)),
     onSuccess: invalidate,
+    onError: () => setFormError(t('pages.page.error', { defaultValue: "L'enregistrement a échoué." })),
   });
 
   const onSubmit = (e: FormEvent) => {
@@ -61,7 +66,7 @@ export function Website() {
   const startEdit = (idx: number) => {
     setEditingIdx(idx);
     setTitle(pages[idx].title);
-    setContent(pages[idx].content);
+    setContent(pages[idx].content ?? '');
   };
 
   return (
@@ -100,6 +105,11 @@ export function Website() {
 
       {/* Liste des pages */}
       <h2 style={{ fontSize: 18 }} className="mb-12">{t('pages.pages', { defaultValue: 'Pages' })}</h2>
+      {query.isError && (
+        <div className="alert alert-warning" role="alert" data-pages-error>
+          {t('pages.error', { defaultValue: 'Une erreur est survenue.' })}
+        </div>
+      )}
       {query.isLoading && <p>{t('pages.loading', { defaultValue: 'Chargement…' })}</p>}
       {!query.isLoading && pages.length === 0 && (
         <p className="text-muted">{t('pages.pages.empty', { defaultValue: 'Aucune page. Ajoutez-en une.' })}</p>
@@ -113,7 +123,13 @@ export function Website() {
                 <div className="text-muted" style={{ fontSize: 14 }}>{pagePreview(p.content)}</div>
               </div>
               <div className="d-flex gap-8">
-                <button type="button" className="btn btn-link p-0" onClick={() => startEdit(idx)}>{t('pages.edit', { defaultValue: 'Modifier' })}</button>
+                {isGridPage(p) ? (
+                  <span className="text-muted" style={{ fontSize: 13 }} data-grid-page>
+                    {t('pages.page.grid', { defaultValue: "Mise en page avancée : à modifier depuis l'ancienne interface." })}
+                  </span>
+                ) : (
+                  <button type="button" className="btn btn-link p-0" onClick={() => startEdit(idx)}>{t('pages.edit', { defaultValue: 'Modifier' })}</button>
+                )}
                 <button
                   type="button"
                   className="btn btn-link p-0 text-danger"
