@@ -13,6 +13,7 @@ import {
 import { sanitizeHtml } from '../sanitize';
 import { kindOf, SnipletSource } from '../sniplets';
 import { canUpdateSite, isGridPage, isPagePublished } from '../utils';
+import { BlockPicker } from './BlockPicker';
 import { SnipletPicker } from './SnipletPicker';
 import { SnipletView } from './SnipletView';
 
@@ -130,6 +131,8 @@ export function PageEditor() {
 
   // Cellule en cours de choix d'un contenu interactif
   const [pickingUid, setPickingUid] = useState<string | null>(null);
+  // Cellule en cours de choix d'un bloc modèle
+  const [blockUid, setBlockUid] = useState<string | null>(null);
 
   const widthOptions = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), []);
 
@@ -193,7 +196,16 @@ export function PageEditor() {
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => pick(r, c, 'image')}>{t('pages.editor.type.image', { defaultValue: 'Image' })}</button>
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => pick(r, c, 'video')}>{t('pages.editor.type.video', { defaultValue: 'Vidéo' })}</button>
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => pick(r, c, 'audio')}>{t('pages.editor.type.sound', { defaultValue: 'Son' })}</button>
-                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPickingUid(cell._uid ?? null)} data-choose-sniplet>{t('pages.editor.type.sniplet', { defaultValue: "Contenu d'une application" })}</button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setBlockUid(cell._uid ?? null); setPickingUid(null); }} data-choose-block>{t('pages.editor.type.block', { defaultValue: 'Modèle' })}</button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setPickingUid(cell._uid ?? null); setBlockUid(null); }} data-choose-sniplet>{t('pages.editor.type.sniplet', { defaultValue: "Contenu d'une application" })}</button>
+                    </div>
+                  )}
+                  {(!type || type === 'empty') && blockUid !== null && blockUid === cell._uid && (
+                    <div className="mt-8">
+                      <BlockPicker
+                        onPick={(html) => { change(setCellMedia(grid, r, c, { type: 'text', source: html })); setBlockUid(null); }}
+                        onCancel={() => setBlockUid(null)}
+                      />
                     </div>
                   )}
                   {(!type || type === 'empty') && pickingUid !== null && pickingUid === cell._uid && (

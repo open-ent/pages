@@ -16,6 +16,17 @@ const ALLOWED_STYLE_PROPS = new Set([
   'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right', 'padding', 'float', 'display', 'line-height',
 ]);
 
+let translator: (key: string) => string = (key) => key;
+/** Fonction de traduction des éléments `<i18n>clé</i18n>` des anciens contenus (blocs modèles de l'éditeur historique). */
+export function setSanitizeTranslator(fn: (key: string) => string): void {
+  translator = fn;
+}
+
+/** Image par défaut des blocs modèles : seule ressource de thème que les anciens contenus référencent par `skin-src`. */
+const SKIN_IMAGES: Record<string, string> = {
+  '/img/illustrations/image-default.svg': '/assets/themes/entcore-css-lib/editor-resources/img/image-default.svg',
+};
+
 /** Adresse autorisée : http(s), mailto, relative (/…, #…, ./…). Ex. « javascript:alert(1) » est refusée. */
 export function isSafeUrl(url: string, allowHttpOnly = false): boolean {
   const u = url.trim().replace(/[\u0000-\u001f\s]+/g, '');
@@ -56,6 +67,7 @@ function cleanNode(node: Node, doc: Document, allowIframe: boolean): Node | null
     for (const a of ['width', 'height', 'title']) if (el.hasAttribute(a)) f.setAttribute(a, el.getAttribute(a)!);
     return f;
   }
+  if (tag === 'i18n') return doc.createTextNode(translator((el.textContent ?? '').trim()));
   if (!ALLOWED_TAGS.has(tag) && !(allowIframe && MEDIA_TAGS.has(tag))) {
     // balise inconnue : on garde son contenu (texte, balises autorisées) sans la balise
     const frag = doc.createDocumentFragment();
@@ -65,6 +77,11 @@ function cleanNode(node: Node, doc: Document, allowIframe: boolean): Node | null
   const out = doc.createElement(tag);
   for (const attr of Array.from(el.attributes)) {
     const name = attr.name.toLowerCase();
+    // Ancien contenu : `skin-src` désignait une image du thème de l'ENT
+    if (name === 'skin-src' && tag === 'img' && SKIN_IMAGES[attr.value.trim()]) {
+      out.setAttribute('src', SKIN_IMAGES[attr.value.trim()]);
+      continue;
+    }
     if (!ALLOWED_ATTRS.has(name)) continue;
     if ((name === 'href' || name === 'src') && !isSafeUrl(attr.value)) continue;
     if (name === 'style') {

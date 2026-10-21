@@ -5,9 +5,11 @@ import {
   LoadingScreen,
   useEdificeClient,
 } from '@open-ent/react';
+import i18n from 'i18next';
 import { Outlet } from 'react-router-dom';
 
 import { setLanguage } from '../locale';
+import { setSanitizeTranslator } from '../sanitize';
 
 /** Gabarit commun : bandeau ENT (Layout + AppHeader + fil d'Ariane) + contenu. */
 export function Root() {
@@ -17,6 +19,8 @@ export function Root() {
   // posée pendant le rendu, et non dans un effet : les écrans sont montés sous ce composant
   // et formateraient leurs premières dates en français avant que l'effet ne s'exécute.
   setLanguage(currentLanguage);
+  // `<i18n>clé</i18n>` des anciens contenus (blocs modèles) : traduit avec les textes du module et communs
+  setSanitizeTranslator((key) => i18n.t(key, { ns: ['pages', 'common'], defaultValue: key }) as string);
 
   if (!init) return <LoadingScreen />;
 

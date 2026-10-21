@@ -24,3 +24,36 @@
     grid-column: 1 / -1 !important;
   }
 }
+
+/* Blocs modèles (reprennent les classes de l'éditeur historique) : mise en page minimale, sans le thème AngularJS */
+.pages-template-block {
+  margin-bottom: 12px;
+}
+.pages-template-block .centered-text {
+  text-align: center;
+}
+.pages-template-block .right-magnet {
+  float: right;
+  width: 40%;
+  margin: 0 0 8px 16px;
+}
+.pages-template-block .left-magnet,
+.pages-template-block .cell.block-container {
+  float: left;
+  width: 40%;
+  margin: 0 16px 8px 0;
+}
+/* L'image par défaut est un SVG sans dimensions : sans largeur imposée elle s'effondre à 0 dans un bloc flottant */
+.pages-template-block img {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
+.pages-template-block .overflow-hd {
+  overflow: hidden;
+}
+.pages-template-block.quote-block em,
+.pages-template-block .quote-block em {
+  display: block;
+  margin-top: 8px;
+}
