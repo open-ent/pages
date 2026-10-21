@@ -8,11 +8,16 @@ import { api, Page } from '../api';
 import { sanitizeHtml } from '../sanitize';
 import { canUpdateSite, isGridPage, landingPageOf, matchingPage, visiblePages } from '../utils';
 import { GridViewer } from './GridViewer';
+import { PageStyle } from './PageStyle';
 
 /** Contenu d'une page : sa grille (lecture seule) ou, pour une page simple, son HTML assaini. */
 function PageBody({ page }: { page: Page }) {
-  if (isGridPage(page)) return <GridViewer rows={page.rows} />;
-  return <div className="page-content" data-page-content dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content ?? '') }} />;
+  return (
+    <>
+      <PageStyle sass={page.sass} />
+      {isGridPage(page) ? <GridViewer rows={page.rows} /> : <div className="page-content pages-grid" data-page-content dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content ?? '') }} />}
+    </>
+  );
 }
 
 function useSiteAccess(siteId: string) {

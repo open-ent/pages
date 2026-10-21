@@ -15,6 +15,8 @@ import { kindOf, SnipletSource } from '../sniplets';
 import { canUpdateSite, isGridPage, isPagePublished } from '../utils';
 import { BlockPicker } from './BlockPicker';
 import { SnipletPicker } from './SnipletPicker';
+import { PageStyle } from './PageStyle';
+import { StylePanel } from './StylePanel';
 import { SnipletView } from './SnipletView';
 
 type Target = { r: number; c: number; kind: 'image' | 'audio' | 'video' };
@@ -72,18 +74,24 @@ export function PageEditor() {
 
   // Grille en cours d'édition : initialisée une fois depuis la page (grille existante, ou contenu HTML d'une page simple)
   const [rows, setRows] = useState<EditRow[] | null>(null);
+  // Style SASS de la page (édité dans le panneau « Style »)
+  const [sass, setSass] = useState<string | null>(null);
+  const [showStyle, setShowStyle] = useState(false);
   const [state, setState] = useState<'saved' | 'saving' | 'error'>('saved');
   const dirty = useRef(false);
   useEffect(() => {
-    if (page && rows === null) setRows(isGridPage(page) ? normalizeEditRows(page.rows) : rowsFromContent(page.content));
+    if (page && rows === null) {
+      setRows(isGridPage(page) ? normalizeEditRows(page.rows) : rowsFromContent(page.content));
+      setSass(page.sass ?? '');
+    }
   }, [page, rows]);
 
   const latestSite = useRef(site);
   latestSite.current = site;
   const saveMut = useMutation({
-    mutationFn: async (next: EditRow[]) => {
+    mutationFn: async (next: { rows: EditRow[]; sass: string }) => {
       const current = latestSite.current!;
-      const pages = (current.pages ?? []).map((p) => (p.titleLink === pageLink ? { ...p, rows: stripUids(next) } : p));
+      const pages = (current.pages ?? []).map((p) => (p.titleLink === pageLink ? { ...p, rows: stripUids(next.rows), sass: next.sass } : p));
       await api.updateWebsite(siteId, { title: current.title, description: current.description, pages });
     },
     onMutate: () => setState('saving'),
@@ -91,6 +99,7 @@ export function PageEditor() {
     onError: () => setState('error'),
   });
   const change = (next: EditRow[]) => { dirty.current = true; setRows(next); };
+  const changeSass = (next: string) => { dirty.current = true; setSass(next); };
   /** Texte saisi dans une cellule, retrouvée par son identifiant (sa position peut avoir changé entre-temps). */
   const setText = (uid: string, html: string) => {
     dirty.current = true;
@@ -99,9 +108,9 @@ export function PageEditor() {
   const mutate = saveMut.mutate;
   useEffect(() => {
     if (!dirty.current || rows === null) return;
-    const timer = setTimeout(() => { dirty.current = false; mutate(rows); }, AUTOSAVE_DELAY_MS);
+    const timer = setTimeout(() => { dirty.current = false; mutate({ rows, sass: sass ?? '' }); }, AUTOSAVE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [rows, mutate]);
+  }, [rows, sass, mutate]);
 
   const publishMut = useMutation({
     mutationFn: async () => {
@@ -157,9 +166,13 @@ export function PageEditor() {
           <button type="button" className="btn btn-secondary" onClick={() => publishMut.mutate()} disabled={publishMut.isPending} data-publish-toggle>
             {isPagePublished(page) ? t('pages.page.unpublish', { defaultValue: 'Dépublier' }) : t('pages.page.publish', { defaultValue: 'Publier' })}
           </button>
+          <button type="button" className="btn btn-secondary" aria-expanded={showStyle} onClick={() => setShowStyle(!showStyle)} data-toggle-style>{t('pages.editor.style', { defaultValue: 'Style' })}</button>
           <Link className="btn btn-secondary" to={`/site/${siteId}/view/${pageLink}`}>{t('pages.editor.preview', { defaultValue: 'Aperçu' })}</Link>
         </div>
       </div>
+
+      {showStyle && <StylePanel value={sass ?? ''} onChange={changeSass} />}
+      <PageStyle sass={sass ?? ''} />
 
       {grid.length === 0 && <p className="text-muted" data-editor-empty>{t('pages.editor.empty', { defaultValue: 'Cette page est vide. Ajoutez une ligne pour commencer.' })}</p>}
 

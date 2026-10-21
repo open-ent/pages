@@ -11,6 +11,8 @@ export interface Page {
   rows?: unknown[];
   published?: boolean;
   index?: number;
+  /** Style de la page, en SASS (limité à la grille de la page). */
+  sass?: string;
   [extra: string]: unknown;
 }
 
