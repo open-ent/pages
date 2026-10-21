@@ -86,7 +86,10 @@ export function Website() {
       <p>
         <Link to="/">← {t('pages.back', { defaultValue: 'Retour aux sites' })}</Link>
       </p>
-      <h1 className="mb-16">{site?.title ?? t('pages.title', { defaultValue: 'Site' })}</h1>
+      <div className="d-flex justify-content-between align-items-start mb-16 gap-8 flex-wrap">
+        <h1 className="mb-0">{site?.title ?? t('pages.title', { defaultValue: 'Site' })}</h1>
+        {site && <Link className="btn btn-secondary" to={`/site/${siteId}/view`} data-view-site>{t('pages.view', { defaultValue: 'Voir le site' })}</Link>}
+      </div>
       {site?.description && <p className="text-muted">{site.description}</p>}
       {site && <PublishPanel site={site} />}
 

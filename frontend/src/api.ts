@@ -28,6 +28,10 @@ export interface Website {
   trashed?: boolean;
   /** `PUBLIC` : site ouvert à tous (adresse `/pages/p/website`). */
   visibility?: string;
+  /** Lien (`titleLink`) de la page d'accueil du site. */
+  landingPage?: string;
+  /** Partages : une entrée par utilisateur ou groupe, avec les droits accordés (clés `...|update`, `...|manager`). */
+  shared?: Array<Record<string, unknown>>;
   /** Publication dans les applications, par structure (un administrateur local choisit les groupes qui voient le site). */
   published?: Record<string, PublishedEntry>;
 }

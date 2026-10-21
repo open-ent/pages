@@ -1,6 +1,7 @@
 import { RouteObject, createHashRouter } from 'react-router-dom';
 
 import { Root } from './screens/Root';
+import { SitePrint, SiteView } from './screens/SiteView';
 import { Website } from './screens/Website';
 import { Websites } from './screens/Websites';
 
@@ -11,6 +12,9 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <Websites /> },
       { path: 'site/:siteId', element: <Website /> },
+      { path: 'site/:siteId/view', element: <SiteView /> },
+      { path: 'site/:siteId/view/:pageLink', element: <SiteView /> },
+      { path: 'site/:siteId/print', element: <SitePrint /> },
     ],
   },
 ];

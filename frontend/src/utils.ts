@@ -30,3 +30,40 @@ export function pagePreview(html?: string, max = 120): string {
 export function isPagePublished(page: { published?: boolean }): boolean {
   return page.published !== false;
 }
+
+/** Pages visibles : les pages non publiées ne le sont que pour qui peut modifier le site. Ex. visiteur : seulement les publiées. */
+export function visiblePages<P extends { published?: boolean }>(pages: P[], editMode: boolean): P[] {
+  return pages.filter((p) => isPagePublished(p) || editMode);
+}
+
+/** Page d'accueil : celle désignée par `landingPage` si elle est visible, sinon la première page visible. */
+export function landingPageOf<P extends { titleLink?: string; published?: boolean }>(pages: P[], landingPage: string | undefined, editMode: boolean): P | undefined {
+  const visible = visiblePages(pages, editMode);
+  return visible.find((p) => p.titleLink === landingPage) ?? visible[0];
+}
+
+/** Page demandée par son lien ; à défaut (lien inconnu ou page non visible), la page d'accueil. */
+export function matchingPage<P extends { titleLink?: string; published?: boolean }>(pages: P[], link: string | undefined, landingPage: string | undefined, editMode: boolean): P | undefined {
+  if (link) {
+    const found = visiblePages(pages, editMode).find((p) => p.titleLink === link);
+    if (found) return found;
+  }
+  return landingPageOf(pages, landingPage, false);
+}
+
+/**
+ * L'utilisateur peut-il modifier le site ? Propriétaire, ou partage (à lui ou à l'un de ses groupes) portant un droit
+ * `…|update` ou `…|manager`. Ex. contributeur via le groupe « Enseignants » du site.
+ */
+export function canUpdateSite(
+  site: { owner?: { userId: string }; shared?: Array<Record<string, unknown>> },
+  userId: string | undefined,
+  groupIds: string[] = [],
+): boolean {
+  if (!userId) return false;
+  if (site.owner?.userId === userId) return true;
+  return (site.shared ?? []).some((s) => {
+    const mine = s.userId === userId || (typeof s.groupId === 'string' && groupIds.includes(s.groupId));
+    return mine && Object.keys(s).some((k) => /\|(update|manager)$/.test(k) && s[k] === true);
+  });
+}
