@@ -1,6 +1,7 @@
 import { RouteObject, createHashRouter } from 'react-router-dom';
 
 import { Root } from './screens/Root';
+import { PageEditor } from './screens/PageEditor';
 import { SitePrint, SiteView } from './screens/SiteView';
 import { Website } from './screens/Website';
 import { Websites } from './screens/Websites';
@@ -15,6 +16,7 @@ export const routes: RouteObject[] = [
       { path: 'site/:siteId/view', element: <SiteView /> },
       { path: 'site/:siteId/view/:pageLink', element: <SiteView /> },
       { path: 'site/:siteId/print', element: <SitePrint /> },
+      { path: 'site/:siteId/edit/:pageLink', element: <PageEditor /> },
     ],
   },
 ];

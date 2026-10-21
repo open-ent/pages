@@ -152,9 +152,12 @@ export function Website() {
                     {previews.includes(idx) ? t('pages.page.preview.hide', { defaultValue: "Masquer l'aperçu" }) : t('pages.page.preview', { defaultValue: 'Aperçu' })}
                   </button>
                 )}
+                <Link className="btn btn-link p-0" to={`/site/${siteId}/edit/${p.titleLink}`} data-edit-layout>
+                  {t('pages.page.layout', { defaultValue: 'Mettre en page' })}
+                </Link>
                 {isGridPage(p) ? (
                   <span className="text-muted" style={{ fontSize: 13 }} data-grid-page>
-                    {t('pages.page.grid', { defaultValue: "Mise en page avancée : à modifier depuis l'ancienne interface." })}
+                    {t('pages.page.grid', { defaultValue: 'Page en grille' })}
                   </span>
                 ) : (
                   <button type="button" className="btn btn-link p-0" onClick={() => startEdit(idx)}>{t('pages.edit', { defaultValue: 'Modifier' })}</button>

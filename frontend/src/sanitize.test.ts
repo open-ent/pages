@@ -24,6 +24,12 @@ describe('sanitizeHtml', () => {
     expect(sanitizeHtml('<iframe src="javascript:alert(1)"></iframe>', true)).toBe('');
     expect(sanitizeHtml('<iframe src="/local"></iframe>', true)).toBe('');
   });
+  it('admet les lecteurs vidéo/audio seulement dans une cellule vidéo, avec une source sûre', () => {
+    const video = '<video controls src="/workspace/document/42"></video>';
+    expect(sanitizeHtml(video, true)).toContain('<video controls="" src="/workspace/document/42">');
+    expect(sanitizeHtml(video)).toBe('');
+    expect(sanitizeHtml('<video src="javascript:alert(1)"></video>', true)).not.toContain('javascript');
+  });
   it('filtre les styles dangereux', () => {
     expect(cleanStyle('color:red; background:url(javascript:x); text-align:center')).toBe('color:red; text-align:center');
     expect(isSafeUrl('javascript:alert(1)')).toBe(false);

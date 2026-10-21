@@ -8,7 +8,9 @@ const ALLOWED_TAGS = new Set([
   'li', 'ol', 'p', 'pre', 's', 'span', 'strong', 'sub', 'sup', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul',
 ]);
 const DROPPED_WITH_CONTENT = new Set(['script', 'style', 'object', 'embed', 'link', 'meta', 'form', 'input', 'button', 'textarea', 'select', 'noscript', 'template']);
-const ALLOWED_ATTRS = new Set(['href', 'src', 'alt', 'title', 'class', 'style', 'colspan', 'rowspan', 'target', 'rel', 'width', 'height']);
+const ALLOWED_ATTRS = new Set(['href', 'src', 'alt', 'title', 'class', 'style', 'colspan', 'rowspan', 'target', 'rel', 'width', 'height', 'controls']);
+/** Balises de lecteur, admises seulement dans une cellule vidéo (`allowIframe`). */
+const MEDIA_TAGS = new Set(['video', 'audio', 'source']);
 const ALLOWED_STYLE_PROPS = new Set([
   'color', 'background-color', 'text-align', 'font-size', 'font-weight', 'font-style', 'font-family', 'text-decoration', 'width', 'height',
   'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right', 'padding', 'float', 'display', 'line-height',
@@ -54,7 +56,7 @@ function cleanNode(node: Node, doc: Document, allowIframe: boolean): Node | null
     for (const a of ['width', 'height', 'title']) if (el.hasAttribute(a)) f.setAttribute(a, el.getAttribute(a)!);
     return f;
   }
-  if (!ALLOWED_TAGS.has(tag)) {
+  if (!ALLOWED_TAGS.has(tag) && !(allowIframe && MEDIA_TAGS.has(tag))) {
     // balise inconnue : on garde son contenu (texte, balises autorisées) sans la balise
     const frag = doc.createDocumentFragment();
     el.childNodes.forEach((c) => { const n = cleanNode(c, doc, allowIframe); if (n) frag.appendChild(n); });
