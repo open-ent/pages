@@ -1,11 +1,10 @@
-import { useTranslation } from 'react-i18next';
-
 import { GridCell, GridRow, normalizeRows, subRows } from '../gridModel';
 import { sanitizeHtml } from '../sanitize';
+import { SnipletSource } from '../sniplets';
+import { SnipletView } from './SnipletView';
 
 /** Un média de cellule : texte/vidéo (HTML assaini), image, son ; l'interactif (sniplet) n'est pas rendu ici. */
 function CellContent({ cell, depth }: { cell: GridCell; depth: number }) {
-  const { t } = useTranslation(['pages', 'common']);
   const media = cell.media ?? {};
   const source = typeof media.source === 'string' ? media.source : '';
   switch (media.type) {
@@ -20,11 +19,7 @@ function CellContent({ cell, depth }: { cell: GridCell; depth: number }) {
     case 'grid':
       return depth < 4 ? <GridRows rows={subRows(cell)} depth={depth + 1} /> : null;
     case 'sniplet':
-      return (
-        <p className="text-muted mb-0" data-sniplet>
-          {t('pages.page.sniplet', { defaultValue: "Contenu interactif : à consulter depuis l'ancienne interface." })}
-        </p>
-      );
+      return media.source ? <SnipletView sniplet={media.source as SnipletSource} /> : null;
     default:
       return null;
   }

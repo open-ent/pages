@@ -11,7 +11,10 @@ import {
   setCellMedia, setCellTitle, setCellWidth, stripUids,
 } from '../gridEdit';
 import { sanitizeHtml } from '../sanitize';
+import { kindOf, SnipletSource } from '../sniplets';
 import { canUpdateSite, isGridPage, isPagePublished } from '../utils';
+import { SnipletPicker } from './SnipletPicker';
+import { SnipletView } from './SnipletView';
 
 type Target = { r: number; c: number; kind: 'image' | 'audio' | 'video' };
 
@@ -125,6 +128,9 @@ export function PageEditor() {
   };
   const onLibraryCancel = () => { library.current?.hide(); setTarget(null); };
 
+  // Cellule en cours de choix d'un contenu interactif
+  const [pickingUid, setPickingUid] = useState<string | null>(null);
+
   const widthOptions = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), []);
 
   if (query.isLoading) return <p>{t('pages.loading', { defaultValue: 'Chargement…' })}</p>;
@@ -187,6 +193,15 @@ export function PageEditor() {
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => pick(r, c, 'image')}>{t('pages.editor.type.image', { defaultValue: 'Image' })}</button>
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => pick(r, c, 'video')}>{t('pages.editor.type.video', { defaultValue: 'Vidéo' })}</button>
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => pick(r, c, 'audio')}>{t('pages.editor.type.sound', { defaultValue: 'Son' })}</button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPickingUid(cell._uid ?? null)} data-choose-sniplet>{t('pages.editor.type.sniplet', { defaultValue: "Contenu d'une application" })}</button>
+                    </div>
+                  )}
+                  {(!type || type === 'empty') && pickingUid !== null && pickingUid === cell._uid && (
+                    <div className="mt-8">
+                      <SnipletPicker
+                        onPick={(src: SnipletSource) => { change(setCellMedia(grid, r, c, { type: 'sniplet', source: src })); setPickingUid(null); }}
+                        onCancel={() => setPickingUid(null)}
+                      />
                     </div>
                   )}
                   {type === 'text' && (
@@ -215,7 +230,13 @@ export function PageEditor() {
                       <button type="button" className="btn btn-link p-0 d-block" onClick={() => pick(r, c, 'video')}>{t('pages.editor.change', { defaultValue: 'Choisir un autre média' })}</button>
                     </div>
                   )}
-                  {type && !['empty', 'text', 'image', 'sound', 'video'].includes(type) && (
+                  {type === 'sniplet' && kindOf(cell.media?.source as SnipletSource | undefined) && (
+                    <div data-cell-sniplet>
+                      <SnipletView sniplet={cell.media!.source as SnipletSource} />
+                      <button type="button" className="btn btn-link p-0 d-block" onClick={() => change(setCellMedia(grid, r, c, { type: 'empty' }))}>{t('pages.editor.sniplet.reset', { defaultValue: 'Changer de contenu' })}</button>
+                    </div>
+                  )}
+                  {type && !['empty', 'text', 'image', 'sound', 'video'].includes(type) && !(type === 'sniplet' && kindOf(cell.media?.source as SnipletSource | undefined)) && (
                     <p className="text-muted mb-0" data-cell-readonly>{t('pages.editor.readonly', { defaultValue: "Contenu interactif : non modifiable ici, il est conservé tel quel." })}</p>
                   )}
                   {type && type !== 'empty' && (
