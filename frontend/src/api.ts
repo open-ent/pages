@@ -124,13 +124,19 @@ export const createWebsite = async (data: { title: string; description?: string;
 /** Met à jour un site (métadonnées et/ou tableau de pages embarquées). */
 export const updateWebsite = async (
   id: string,
-  data: { title?: string; description?: string; pages?: Page[]; trashed?: boolean; published?: Record<string, PublishedEntry> },
+  data: { title?: string; description?: string; pages?: Page[]; trashed?: boolean; published?: Record<string, PublishedEntry>; landingPage?: string },
 ): Promise<unknown> =>
   json<unknown>(await fetch(`/pages/${id}`, { ...base, method: 'PUT', headers: mutHeaders(), body: JSON.stringify(data) }));
 
 /** Corbeille : bascule le drapeau `trashed` du site (PUT partiel, $set Mongo). */
 export const setWebsiteTrashed = async (id: string, trashed: boolean): Promise<void> => {
   await updateWebsite(id, { trashed });
+};
+
+/** Droits de modification d'une page : seuls ces groupes/utilisateurs (parmi les partages du site) peuvent la modifier ; vide = tous. */
+export const setPageRights = async (siteId: string, pageLink: string, contrib: string[]): Promise<void> => {
+  const res = await fetch(`/pages/${siteId}/page/${encodeURIComponent(pageLink)}/rights`, { ...base, method: 'PUT', headers: mutHeaders(), body: JSON.stringify({ contrib }) });
+  if (!res.ok) throw new Error(String(res.status));
 };
 
 // ── Publication dans les applications (annuaire d'applications) ──────────────────────────────────
@@ -215,6 +221,7 @@ export const api = {
   createWebsite,
   updateWebsite,
   setWebsiteTrashed,
+  setPageRights,
   getLocalAdminStructures,
   getGroupsRoles,
   createExternalApplication,
