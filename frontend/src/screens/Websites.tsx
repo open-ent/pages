@@ -37,7 +37,17 @@ export function Websites() {
   });
   const deleteFolderMut = useMutation({ mutationFn: (id: string) => api.deleteFolder(id), onSuccess: invalidate });
   const trashMut = useMutation({
-    mutationFn: ({ id, trashed }: { id: string; trashed: boolean }) => api.setWebsiteTrashed(id, trashed),
+    mutationFn: async ({ id, trashed }: { id: string; trashed: boolean }) => {
+      // Un site mis à la corbeille disparaît des applications des groupes : on supprime ses applications publiées
+      if (trashed) {
+        const site = await api.getWebsite(id);
+        const entries = Object.values(site.published ?? {});
+        // Suppression « au mieux » comme l'AngularJS : la console d'administration peut la refuser (401) à un administrateur local
+        for (const e of entries) await api.deleteExternalApplication(e.application.id).catch(() => undefined);
+        if (entries.length > 0) await api.updateWebsite(id, { published: {} });
+      }
+      await api.setWebsiteTrashed(id, trashed);
+    },
     onSuccess: invalidate,
   });
   const moveMut = useMutation({

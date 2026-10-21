@@ -26,6 +26,24 @@ export interface Website {
   created?: { $date: string };
   /** Corbeille : site mis de côté (restaurable), cf. modèle Angular. */
   trashed?: boolean;
+  /** `PUBLIC` : site ouvert à tous (adresse `/pages/p/website`). */
+  visibility?: string;
+  /** Publication dans les applications, par structure (un administrateur local choisit les groupes qui voient le site). */
+  published?: Record<string, PublishedEntry>;
+}
+
+/** Publication d'un site dans une structure : application externe, rôle associé et groupes autorisés. */
+export interface PublishedEntry {
+  application: { id: string };
+  role: { id: string };
+  groups: Array<{ id: string; name: string }>;
+}
+
+/** Groupe d'une structure et rôles qu'il porte (annuaire d'applications). */
+export interface RoleGroup {
+  id: string;
+  name: string;
+  roles?: string[];
 }
 
 /** Dossier de rangement des sites (collection pagesFolders). */
@@ -102,13 +120,53 @@ export const createWebsite = async (data: { title: string; description?: string;
 /** Met à jour un site (métadonnées et/ou tableau de pages embarquées). */
 export const updateWebsite = async (
   id: string,
-  data: { title?: string; description?: string; pages?: Page[]; trashed?: boolean },
+  data: { title?: string; description?: string; pages?: Page[]; trashed?: boolean; published?: Record<string, PublishedEntry> },
 ): Promise<unknown> =>
   json<unknown>(await fetch(`/pages/${id}`, { ...base, method: 'PUT', headers: mutHeaders(), body: JSON.stringify(data) }));
 
 /** Corbeille : bascule le drapeau `trashed` du site (PUT partiel, $set Mongo). */
 export const setWebsiteTrashed = async (id: string, trashed: boolean): Promise<void> => {
   await updateWebsite(id, { trashed });
+};
+
+// ── Publication dans les applications (annuaire d'applications) ──────────────────────────────────
+/** Droits d'administrateur local de l'utilisateur : identifiants des structures qu'il administre (vide sinon). */
+export const getLocalAdminStructures = async (): Promise<string[]> => {
+  const me = await json<{ functions?: { ADMIN_LOCAL?: { scope?: string[] } } }>(await fetch('/auth/oauth2/userinfo', base));
+  return me?.functions?.ADMIN_LOCAL?.scope ?? [];
+};
+
+/** Groupes d'une structure avec leurs rôles. */
+export const getGroupsRoles = async (structureId: string): Promise<RoleGroup[]> =>
+  json<RoleGroup[]>(await fetch(`/appregistry/groups/roles?structureId=${encodeURIComponent(structureId)}`, base));
+
+/** Crée l'application externe qui représente le site dans une structure ; renvoie l'application et son rôle. */
+export const createExternalApplication = async (
+  structureId: string,
+  app: { displayName: string; name: string; address: string; icon: string },
+): Promise<{ id: string; roleId: string }> =>
+  json<{ id: string; roleId: string }>(
+    await fetch(`/appregistry/application/external?structureId=${encodeURIComponent(structureId)}`, {
+      ...base,
+      method: 'POST',
+      headers: mutHeaders(),
+      body: JSON.stringify({ grantType: 'authorization_code', secret: '', target: '', appLocked: true, scope: '', ...app }),
+    }),
+  );
+
+export const deleteExternalApplication = async (applicationId: string): Promise<void> => {
+  const res = await fetch(`/appregistry/application/external/${applicationId}`, { ...base, method: 'DELETE', headers: xsrfHeader() });
+  if (!res.ok && res.status !== 404) throw new Error(String(res.status));
+};
+
+export const authorizeGroup = async (groupId: string, roleId: string): Promise<void> => {
+  const res = await fetch(`/appregistry/authorize/group/${groupId}/role/${roleId}`, { ...base, method: 'PUT', headers: xsrfHeader() });
+  if (!res.ok) throw new Error(String(res.status));
+};
+
+export const unauthorizeGroup = async (groupId: string, roleId: string): Promise<void> => {
+  const res = await fetch(`/appregistry/authorize/group/${groupId}/role/${roleId}`, { ...base, method: 'DELETE', headers: xsrfHeader() });
+  if (!res.ok && res.status !== 404) throw new Error(String(res.status));
 };
 
 // ── Dossiers (rangement des sites) ────────────────────────────────────────────
@@ -153,6 +211,12 @@ export const api = {
   createWebsite,
   updateWebsite,
   setWebsiteTrashed,
+  getLocalAdminStructures,
+  getGroupsRoles,
+  createExternalApplication,
+  deleteExternalApplication,
+  authorizeGroup,
+  unauthorizeGroup,
   getFolders,
   createFolder,
   updateFolder,

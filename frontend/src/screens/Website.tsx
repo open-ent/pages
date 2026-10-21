@@ -6,6 +6,7 @@ import { Link, useParams } from 'react-router-dom';
 import { api, Page } from '../api';
 import { isGridPage, isPagePublished, pagePreview, slugify } from '../utils';
 import { GridViewer } from './GridViewer';
+import { PublishPanel } from './PublishPanel';
 
 /** Détail d'un site : gestion des pages embarquées (ajout / édition / suppression). */
 export function Website() {
@@ -87,6 +88,7 @@ export function Website() {
       </p>
       <h1 className="mb-16">{site?.title ?? t('pages.title', { defaultValue: 'Site' })}</h1>
       {site?.description && <p className="text-muted">{site.description}</p>}
+      {site && <PublishPanel site={site} />}
 
       {/* Formulaire de page */}
       <form className="card p-16 mb-16" onSubmit={onSubmit}>
