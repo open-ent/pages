@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
 import { api, Page } from '../api';
-import { isGridPage, pagePreview, slugify } from '../utils';
+import { isGridPage, isPagePublished, pagePreview, slugify } from '../utils';
+import { GridViewer } from './GridViewer';
 
 /** Détail d'un site : gestion des pages embarquées (ajout / édition / suppression). */
 export function Website() {
@@ -23,6 +24,9 @@ export function Website() {
   const [content, setContent] = useState('');
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [formError, setFormError] = useState('');
+  // Pages dont l'aperçu en grille est déplié (par indice)
+  const [previews, setPreviews] = useState<number[]>([]);
+  const togglePreview = (idx: number) => setPreviews((prev) => (prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]));
 
   /** Sauvegarde le site avec un nouveau tableau de pages. */
   const putPages = (nextPages: Page[]) =>
@@ -49,6 +53,13 @@ export function Website() {
   });
   const deleteMut = useMutation({
     mutationFn: (idx: number) => putPages(pages.filter((_, i) => i !== idx)),
+    onSuccess: invalidate,
+    onError: () => setFormError(t('pages.page.error', { defaultValue: "L'enregistrement a échoué." })),
+  });
+
+  // Publier / dépublier une page : même drapeau `published` que l'éditeur historique
+  const publishMut = useMutation({
+    mutationFn: (idx: number) => putPages(pages.map((p, i) => (i === idx ? { ...p, published: !isPagePublished(p) } : p))),
     onSuccess: invalidate,
     onError: () => setFormError(t('pages.page.error', { defaultValue: "L'enregistrement a échoué." })),
   });
@@ -119,10 +130,23 @@ export function Website() {
           <li key={idx} className="py-12 border-bottom">
             <div className="d-flex justify-content-between align-items-start">
               <div className="flex-grow-1">
-                <div className="fw-bold">{p.title}</div>
+                <div className="fw-bold">
+                  {p.title}
+                  <span className={`badge ms-8 ${isPagePublished(p) ? 'bg-success' : 'bg-secondary'}`} data-page-status={isPagePublished(p) ? 'published' : 'unpublished'}>
+                    {isPagePublished(p) ? t('pages.page.published', { defaultValue: 'Publiée' }) : t('pages.page.unpublished', { defaultValue: 'Non publiée' })}
+                  </span>
+                </div>
                 <div className="text-muted" style={{ fontSize: 14 }}>{pagePreview(p.content)}</div>
               </div>
               <div className="d-flex gap-8">
+                <button type="button" className="btn btn-link p-0" onClick={() => publishMut.mutate(idx)} disabled={publishMut.isPending} data-publish-toggle>
+                  {isPagePublished(p) ? t('pages.page.unpublish', { defaultValue: 'Dépublier' }) : t('pages.page.publish', { defaultValue: 'Publier' })}
+                </button>
+                {isGridPage(p) && (
+                  <button type="button" className="btn btn-link p-0" aria-expanded={previews.includes(idx)} onClick={() => togglePreview(idx)} data-grid-preview-toggle>
+                    {previews.includes(idx) ? t('pages.page.preview.hide', { defaultValue: "Masquer l'aperçu" }) : t('pages.page.preview', { defaultValue: 'Aperçu' })}
+                  </button>
+                )}
                 {isGridPage(p) ? (
                   <span className="text-muted" style={{ fontSize: 13 }} data-grid-page>
                     {t('pages.page.grid', { defaultValue: "Mise en page avancée : à modifier depuis l'ancienne interface." })}
@@ -141,6 +165,11 @@ export function Website() {
                 </button>
               </div>
             </div>
+            {isGridPage(p) && previews.includes(idx) && (
+              <div className="card p-16 mt-12" data-grid-preview>
+                <GridViewer rows={p.rows} />
+              </div>
+            )}
           </li>
         ))}
       </ul>

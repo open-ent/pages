@@ -25,3 +25,8 @@ export function pagePreview(html?: string, max = 120): string {
     .trim();
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
+
+/** Une page est publiée sauf si son drapeau vaut explicitement `false` (pages anciennes sans drapeau = publiées). */
+export function isPagePublished(page: { published?: boolean }): boolean {
+  return page.published !== false;
+}

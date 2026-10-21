@@ -7,3 +7,20 @@
 .btn-link:focus {
   color: var(--bs-link-hover-color, #0a58ca);
 }
+
+/* Aperçu d'une page en grille : 12 colonnes, une cellule par colonne ; empilé sur petit écran */
+.pages-grid .pages-grid-row {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.pages-grid .pages-grid-cell img,
+.pages-grid .pages-grid-cell iframe {
+  max-width: 100%;
+}
+@media (max-width: 767px) {
+  .pages-grid .pages-grid-cell {
+    grid-column: 1 / -1 !important;
+  }
+}
