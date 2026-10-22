@@ -5,7 +5,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useEdificeClient } from '@open-ent/react';
 
 import { api, Page } from '../api';
-import { isGridPage, isPagePublished, pagePreview, slugify } from '../utils';
+import { isGridPage, isPagePublished, pagePreview, pageUrl, slugify } from '../utils';
 import { GridViewer } from './GridViewer';
 import { canManageSite, duplicatePage, movePage, removePage, renamePage } from '../pagesAdmin';
 import { PageRightsPanel } from './PageRightsPanel';
@@ -61,6 +61,7 @@ export function Website() {
   const [renamingIdx, setRenamingIdx] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [rightsIdx, setRightsIdx] = useState<number | null>(null);
+  const [urlIdx, setUrlIdx] = useState<number | null>(null);
   const adminMut = useMutation({
     mutationFn: (v: { pages: Page[]; landingPage?: string }) =>
       api.updateWebsite(siteId, { title: site!.title, description: site?.description, pages: v.pages, ...(v.landingPage !== undefined ? { landingPage: v.landingPage } : {}) }),
@@ -170,6 +171,7 @@ export function Website() {
                 {site && canManageSite(site, p as { owner?: unknown }, me?.userId, me?.groupsIds ?? []) && (
                   <button type="button" className="btn btn-link p-0" onClick={() => setRightsIdx(rightsIdx === idx ? null : idx)} data-page-rights-toggle>{t('pages.rights.manage', { defaultValue: 'Droits de modification' })}</button>
                 )}
+                <button type="button" className="btn btn-link p-0" aria-expanded={urlIdx === idx} onClick={() => setUrlIdx(urlIdx === idx ? null : idx)} data-show-url>{t('pages.page.url', { defaultValue: "Adresse" })}</button>
                 <button type="button" className="btn btn-link p-0" onClick={() => publishMut.mutate(idx)} disabled={publishMut.isPending} data-publish-toggle>
                   {isPagePublished(p) ? t('pages.page.unpublish', { defaultValue: 'Dépublier' }) : t('pages.page.publish', { defaultValue: 'Publier' })}
                 </button>
@@ -199,6 +201,9 @@ export function Website() {
                 </button>
               </div>
             </div>
+            {urlIdx === idx && site && (
+              <p className="mt-8 mb-0" data-page-url><code>{pageUrl(window.location.origin, site, p.titleLink ?? '')}</code></p>
+            )}
             {rightsIdx === idx && (
               <PageRightsPanel siteId={siteId} page={{ title: p.title, titleLink: p.titleLink ?? '', contrib: p.contrib as string[] | undefined }} onClose={() => setRightsIdx(null)} onSaved={() => { setRightsIdx(null); invalidate(); }} />
             )}

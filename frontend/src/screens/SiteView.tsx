@@ -9,6 +9,7 @@ import { sanitizeHtml } from '../sanitize';
 import { canUpdateSite, isGridPage, landingPageOf, matchingPage, visiblePages } from '../utils';
 import { GridViewer } from './GridViewer';
 import { PageStyle } from './PageStyle';
+import { SiteContext } from './SiteContext';
 
 /** Contenu d'une page : sa grille (lecture seule) ou, pour une page simple, son HTML assaini. */
 function PageBody({ page }: { page: Page }) {
@@ -45,6 +46,7 @@ export function SiteView() {
   const page = matchingPage(pages, pageLink, site.landingPage, editMode);
 
   return (
+    <SiteContext.Provider value={{ siteId }}>
     <div data-site-view>
       <div className="d-flex justify-content-between align-items-start flex-wrap gap-8 mb-16 d-print-none">
         <div>
@@ -80,6 +82,7 @@ export function SiteView() {
         <p className="text-muted" data-site-empty>{t('pages.view.empty', { defaultValue: "Ce site n'a pas de page visible." })}</p>
       )}
     </div>
+    </SiteContext.Provider>
   );
 }
 
@@ -105,6 +108,7 @@ export function SitePrint() {
   if (query.isLoading) return <p>{t('pages.loading', { defaultValue: 'Chargement…' })}</p>;
   if (!site) return <div className="alert alert-warning" role="alert">{t('pages.error', { defaultValue: 'Une erreur est survenue.' })}</div>;
   return (
+    <SiteContext.Provider value={{ siteId }}>
     <div data-site-print>
       <h1 className="mb-16">{site.title}</h1>
       {pages.map((p) => (
@@ -114,5 +118,6 @@ export function SitePrint() {
         </article>
       ))}
     </div>
+    </SiteContext.Provider>
   );
 }

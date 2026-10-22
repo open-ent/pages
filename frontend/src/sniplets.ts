@@ -3,12 +3,12 @@
  * Quatre sont reconnus : articles d'un blog, cours/wiki, forum, message libre. Les routes REST sont celles des
  * applications voisines ; un sniplet inconnu est conservé tel quel par l'éditeur sans être affiché.
  */
-export type SnipletKind = 'articles' | 'wiki' | 'forum' | 'message';
+export type SnipletKind = 'articles' | 'wiki' | 'forum' | 'message' | 'navigation';
 
 export interface SnipletSource {
   application: string;
   template: string;
-  source?: { _id?: string; content?: string } & Record<string, unknown>;
+  source?: { _id?: string; content?: string; links?: Array<{ text?: string; title?: string; href?: string; external?: boolean; index?: number }> } & Record<string, unknown>;
 }
 
 export const SNIPLET_KINDS: Array<{ kind: SnipletKind; application: string; template: string; labelKey: string; defaultLabel: string }> = [
@@ -21,11 +21,12 @@ export const SNIPLET_KINDS: Array<{ kind: SnipletKind; application: string; temp
 export function kindOf(src: Partial<SnipletSource> | undefined): SnipletKind | undefined {
   if (!src) return undefined;
   if (src.application === 'community' && src.template === 'message') return 'message';
+  if (src.application === 'pages' && src.template === 'navigation') return 'navigation';
   return SNIPLET_KINDS.find((k) => k.application === src.application && k.template === src.template)?.kind;
 }
 
 /** Source à enregistrer dans la cellule pour une ressource choisie. Ex. blog « b1 » → `{ application: 'blog', template: 'articles', source: { _id: 'b1' } }`. */
-export function toSource(kind: Exclude<SnipletKind, 'message'>, resourceId: string): SnipletSource {
+export function toSource(kind: Exclude<SnipletKind, 'message' | 'navigation'>, resourceId: string): SnipletSource {
   const def = SNIPLET_KINDS.find((k) => k.kind === kind)!;
   return { application: def.application, template: def.template, source: { _id: resourceId } };
 }
@@ -45,7 +46,7 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 /** Ressources que l'utilisateur peut choisir pour un type de sniplet. */
-export async function listChoices(kind: Exclude<SnipletKind, 'message'>): Promise<Choice[]> {
+export async function listChoices(kind: Exclude<SnipletKind, 'message' | 'navigation'>): Promise<Choice[]> {
   if (kind === 'articles') return (await getJson<Array<{ _id: string; title: string }>>('/blog/list/all')).map((b) => ({ id: b._id, label: b.title }));
   if (kind === 'wiki') return (await getJson<Array<{ _id: string; title: string }>>('/wiki/list')).map((w) => ({ id: w._id, label: w.title }));
   return (await getJson<Array<{ _id: string; name: string }>>('/forum/categories')).map((c) => ({ id: c._id, label: c.name }));

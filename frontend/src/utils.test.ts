@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isGridPage, pagePreview, slugify, visiblePages, landingPageOf, matchingPage, canUpdateSite } from './utils';
+import { isGridPage, pagePreview, slugify, visiblePages, landingPageOf, matchingPage, canUpdateSite, pageWeight, pageUrl, HEAVY_PAGE_WEIGHT } from './utils';
 
 describe('pagePreview', () => {
   it('retire les balises HTML', () => {
@@ -68,5 +68,21 @@ describe('canUpdateSite', () => {
   it('inconnu ou non connecté : non', () => {
     expect(canUpdateSite(site, 'u3', ['g9'])).toBe(false);
     expect(canUpdateSite(site, undefined)).toBe(false);
+  });
+});
+
+describe('pageWeight / pageUrl', () => {
+  it('somme les poids des cellules', () => {
+    const rows = [{ cells: [{ media: { type: 'video' } }, { media: { type: 'video' } }, { media: { type: 'text' } }] }, { cells: [{ media: { type: 'empty' } }] }];
+    expect(pageWeight(rows)).toBe(10.3);
+    expect(pageWeight(undefined)).toBe(0);
+  });
+  it('une page chargée dépasse le seuil', () => {
+    const heavy = [{ cells: [{ media: { type: 'sniplet' } }, { media: { type: 'sniplet' } }, { media: { type: 'sniplet' } }, { media: { type: 'video' } }] }];
+    expect(pageWeight(heavy)).toBeGreaterThan(HEAVY_PAGE_WEIGHT);
+  });
+  it('adresse privée et publique', () => {
+    expect(pageUrl('https://ent.fr', { _id: 's1' }, 'accueil')).toBe('https://ent.fr/pages#/website/s1/accueil');
+    expect(pageUrl('https://ent.fr', { _id: 's1', visibility: 'PUBLIC' }, 'accueil')).toBe('https://ent.fr/pages/p/website#/website/s1/accueil');
   });
 });

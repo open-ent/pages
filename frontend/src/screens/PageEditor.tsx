@@ -12,10 +12,11 @@ import {
 } from '../gridEdit';
 import { sanitizeHtml } from '../sanitize';
 import { kindOf, SnipletSource } from '../sniplets';
-import { canUpdateSite, isGridPage, isPagePublished } from '../utils';
+import { canUpdateSite, HEAVY_PAGE_WEIGHT, isGridPage, isPagePublished, pageWeight } from '../utils';
 import { BlockPicker } from './BlockPicker';
 import { SnipletPicker } from './SnipletPicker';
 import { PageStyle } from './PageStyle';
+import { SiteContext } from './SiteContext';
 import { StylePanel } from './StylePanel';
 import { SnipletView } from './SnipletView';
 
@@ -153,6 +154,7 @@ export function PageEditor() {
   const grid = rows;
 
   return (
+    <SiteContext.Provider value={{ siteId }}>
     <div data-page-editor>
       <p><Link to={`/site/${siteId}`}>← {t('pages.editor.back', { defaultValue: 'Retour aux pages du site' })}</Link></p>
       <div className="d-flex justify-content-between align-items-center flex-wrap gap-8 mb-16">
@@ -171,6 +173,9 @@ export function PageEditor() {
         </div>
       </div>
 
+      {pageWeight(grid) > HEAVY_PAGE_WEIGHT && (
+        <div className="alert alert-warning" role="alert" data-page-heavy>{t('page.warning.heavy', { defaultValue: "Cette page utilise beaucoup de contenu. Elle risque d'être longue à télécharger si le réseau est lent." })}</div>
+      )}
       {showStyle && <StylePanel value={sass ?? ''} onChange={changeSass} />}
       <PageStyle sass={sass ?? ''} />
 
@@ -278,6 +283,7 @@ export function PageEditor() {
 
       <MediaLibrary ref={library} appCode={appCode} visibility={site.visibility === 'PUBLIC' ? 'public' : 'protected'} onSuccess={onLibrarySuccess} onCancel={onLibraryCancel} />
     </div>
+    </SiteContext.Provider>
   );
 }
 

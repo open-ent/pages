@@ -67,3 +67,24 @@ export function canUpdateSite(
     return mine && Object.keys(s).some((k) => /\|(update|manager)$/.test(k) && s[k] === true);
   });
 }
+
+/** Poids d'un type de contenu : plus il est élevé, plus la page est longue à charger (mêmes valeurs que l'éditeur historique). */
+const CELL_WEIGHTS: Record<string, number> = { sniplet: 5, text: 0.3, image: 1, sound: 1, video: 5, grid: 3 };
+
+/** Au-delà de ce poids, l'éditeur prévient que la page risque d'être longue à télécharger. */
+export const HEAVY_PAGE_WEIGHT = 17;
+
+/** Poids d'une page : somme des poids de ses cellules. Ex. 2 vidéos + 1 texte → 10,3. */
+export function pageWeight(rows: unknown): number {
+  if (!Array.isArray(rows)) return 0;
+  let total = 0;
+  for (const row of rows as Array<{ cells?: Array<{ media?: { type?: string } }> }>) {
+    for (const cell of row.cells ?? []) total += CELL_WEIGHTS[cell.media?.type ?? ''] ?? 0;
+  }
+  return Math.round(total * 10) / 10;
+}
+
+/** Adresse d'une page à partager, au format de l'éditeur historique (`/pages#/website/<id>/<lien>`, `/pages/p/website#…` pour un site public). */
+export function pageUrl(origin: string, site: { _id: string; visibility?: string }, link: string): string {
+  return `${origin}${site.visibility === 'PUBLIC' ? '/pages/p/website' : '/pages'}#/website/${site._id}/${link}`;
+}

@@ -7,7 +7,7 @@ import { listChoices, SNIPLET_KINDS, SnipletKind, SnipletSource, toSource } from
 /** Choix d'un contenu interactif pour une cellule : type (blog, wiki, forum) puis ressource de l'utilisateur. */
 export function SnipletPicker({ onPick, onCancel }: { onPick: (source: SnipletSource) => void; onCancel: () => void }) {
   const { t } = useTranslation(['pages', 'common']);
-  const [kind, setKind] = useState<Exclude<SnipletKind, 'message'>>('articles');
+  const [kind, setKind] = useState<Exclude<SnipletKind, 'message' | 'navigation'>>('articles');
   const [resourceId, setResourceId] = useState('');
   const query = useQuery({ queryKey: ['pages', 'sniplet-choices', kind], queryFn: () => listChoices(kind), retry: false });
   const choices = query.data ?? [];

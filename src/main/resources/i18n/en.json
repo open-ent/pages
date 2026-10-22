@@ -188,6 +188,7 @@
   "pages.style.sample.title2": "Heading 2",
   "pages.style.sample.text": "This is a sample paragraph with some text",
   "pages.style.sample.and": "and",
+  "pages.page.url": "Address",
   "pages.publish.title": "Show in the apps",
   "pages.push.notif.shared.body": "{0} shared a page with you",
   "pages.share.varyingrights": "Warning: you are about to change sharing rights on several sites. All selected sites will be affected and will only have the new sharing settings.",
