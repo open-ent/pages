@@ -7,7 +7,7 @@ import { Link, useParams } from 'react-router-dom';
 
 import { api, Page } from '../api';
 import {
-  addCell, addRow, DropTarget, EditRow, insertEmptyRow, locateCell, moveCell, moveCellTo, moveRow, resizedWidth, normalizeEditRows, remainingColumns, removeCell, removeRow, rowsFromContent,
+  addCell, addRow, DropTarget, EditRow, insertEmptyCell, insertEmptyRow, locateCell, moveCell, moveCellTo, moveRow, resizedWidth, normalizeEditRows, remainingColumns, removeCell, removeRow, rowsFromContent,
   setCellMedia, setCellTitle, setCellWidth, stripUids,
 } from '../gridEdit';
 import { sanitizeHtml } from '../sanitize';
@@ -199,6 +199,17 @@ export function PageEditor() {
     background: hover === key ? '#4bafd5' : drag ? '#f1f3f5' : 'transparent',
   });
   const bandLabel = (key: string) => (hover === key ? t('pages.editor.row.add', { defaultValue: 'Ajouter une ligne' }) : '+');
+  /**
+   * Un élément du panneau déposé près du bord gauche ou droit d'une cellule crée une cellule voisine ; au milieu, il
+   * remplace le contenu de la cellule (`null` = milieu).
+   */
+  const panelEdge = (e: React.DragEvent<HTMLElement>): 'before' | 'after' | null => {
+    const box = e.currentTarget.getBoundingClientRect();
+    const margin = Math.min(48, box.width * 0.2);
+    if (e.clientX < box.left + margin) return 'before';
+    if (e.clientX > box.right - margin) return 'after';
+    return null;
+  };
   const dropOn = (target: DropTarget) => {
     const item = drag;
     setDrag(null);
@@ -207,6 +218,9 @@ export function PageEditor() {
     if (item.kind === 'cell') { change(moveCellTo(rows, item.uid, target)); return; }
     if ('newRow' in target) {
       const inserted = insertEmptyRow(rows, target.rowUid, target.side);
+      if (inserted) void applyItem(inserted.rows, inserted.cellUid, item);
+    } else if ('edge' in target && target.edge) {
+      const inserted = insertEmptyCell(rows, target.cellUid, target.side);
       if (inserted) void applyItem(inserted.rows, inserted.cellUid, item);
     } else void applyItem(rows, target.cellUid, item);
   };
@@ -304,21 +318,27 @@ export function PageEditor() {
                 <div
                   key={cell._uid ?? c}
                   className="border rounded p-8 position-relative"
-                  style={{ gridColumn: `span ${cell.width}`, ...(hover?.startsWith(`c:${cell._uid}:`) ? { boxShadow: `${hover.endsWith(':before') ? '-' : ''}4px 0 0 #4bafd5` } : {}) }}
+                  style={{ gridColumn: `span ${cell.width}`, ...(hover === `c:${cell._uid}:replace` ? { outline: '3px dashed #4bafd5' } : hover?.startsWith(`c:${cell._uid}:`) ? { boxShadow: `${hover.endsWith(':before') ? '-' : ''}4px 0 0 #4bafd5` } : {}) }}
                   data-editor-cell
                   data-cell-type={type ?? 'empty'}
                   onDragOver={(e) => {
                     if (!drag || dragUid === cell._uid) return;
                     e.preventDefault();
                     const box = e.currentTarget.getBoundingClientRect();
-                    setHover(hoverKey({ cellUid: cell._uid ?? '', side: e.clientX < box.left + box.width / 2 ? 'before' : 'after' }));
+                    if (drag.kind !== 'cell') {
+                      const edge = panelEdge(e);
+                      setHover(edge ? hoverKey({ cellUid: cell._uid ?? '', side: edge }) : `c:${cell._uid}:replace`);
+                    } else setHover(hoverKey({ cellUid: cell._uid ?? '', side: e.clientX < box.left + box.width / 2 ? 'before' : 'after' }));
                   }}
                   onDragLeave={() => setHover(null)}
                   onDrop={(e) => {
                     if (!drag) return;
                     e.preventDefault();
                     const box = e.currentTarget.getBoundingClientRect();
-                    dropOn({ cellUid: cell._uid ?? '', side: e.clientX < box.left + box.width / 2 ? 'before' : 'after' });
+                    if (drag.kind !== 'cell') {
+                      const edge = panelEdge(e);
+                      dropOn({ cellUid: cell._uid ?? '', side: edge ?? 'after', ...(edge ? { edge: true as const } : {}) } as DropTarget);
+                    } else dropOn({ cellUid: cell._uid ?? '', side: e.clientX < box.left + box.width / 2 ? 'before' : 'after' });
                   }}
                 >
                   <div className="d-flex gap-8 align-items-center mb-8 flex-wrap">

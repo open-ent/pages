@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { insertEmptyRow, locateCell, moveCellTo, resizedWidth, stripUids, addCell, addRow, moveCell, moveRow, normalizeEditRows, remainingColumns, removeCell, removeRow, rowsFromContent, setCellMedia, setCellWidth } from './gridEdit';
+import { insertEmptyRow, locateCell, moveCellTo, resizedWidth, stripUids, addCell, addRow, moveCell, moveRow, normalizeEditRows, remainingColumns, removeCell, removeRow, rowsFromContent, setCellMedia, setCellWidth, insertEmptyCell } from './gridEdit';
 
 const grid = () => stripUids(normalizeEditRows([{ index: 0, cells: [{ index: 0, width: 8 }, { index: 1, width: 3 }] }, { index: 1, cells: [{ index: 0, width: 12 }] }]));
 
@@ -126,4 +126,37 @@ describe('insertEmptyRow / locateCell', () => {
   });
   it('ligne inconnue : rien', () => expect(insertEmptyRow(rows, 'inconnue', 'after')).toBeUndefined());
   it('cellule disparue : introuvable', () => expect(locateCell(rows, 'x')).toBeUndefined());
+});
+
+describe('insertEmptyCell (dépôt d’un élément au bord d’une cellule)', () => {
+  const cell = (width: number): EditRow['cells'][number] => ({ _uid: `c${width}-${Math.random()}`, index: 0, width, height: 1, media: { type: 'text', source: 'x' } } as never);
+  const rowOf = (...widths: number[]): EditRow => ({ _uid: `r-${Math.random()}`, index: 0, cells: widths.map(cell) });
+
+  it('ligne avec de la place : la nouvelle cellule prend jusqu’à 6 colonnes, à gauche ou à droite', () => {
+    const rows = [rowOf(6)];
+    const after = insertEmptyCell(rows, rows[0].cells[0]._uid!, 'after')!;
+    expect(after.rows[0].cells.map((c) => c.width)).toEqual([6, 6]);
+    expect(after.rows[0].cells[1]._uid).toBe(after.cellUid);
+    const before = insertEmptyCell([rowOf(8)], rows[0].cells[0]._uid!, 'before');
+    expect(before).toBeUndefined();
+    const rows2 = [rowOf(8)];
+    const b2 = insertEmptyCell(rows2, rows2[0].cells[0]._uid!, 'before')!;
+    expect(b2.rows[0].cells.map((c) => c.width)).toEqual([4, 8]);
+    expect(b2.rows[0].cells[0]._uid).toBe(b2.cellUid);
+  });
+  it('ligne pleine : la cellule voisine cède la moitié de sa largeur', () => {
+    const rows = [rowOf(12)];
+    const r = insertEmptyCell(rows, rows[0].cells[0]._uid!, 'after')!;
+    expect(r.rows[0].cells.map((c) => c.width)).toEqual([6, 6]);
+  });
+  it('ligne pleine et cellule d’une colonne : nouvelle ligne juste après', () => {
+    const rows = [rowOf(1, 11)];
+    const r = insertEmptyCell(rows, rows[0].cells[0]._uid!, 'after')!;
+    expect(r.rows).toHaveLength(2);
+    expect(r.rows[1].cells[0]._uid).toBe(r.cellUid);
+    expect(r.rows[1].cells[0].width).toBe(12);
+  });
+  it('cellule introuvable : sans effet', () => {
+    expect(insertEmptyCell([rowOf(6)], 'inconnue', 'after')).toBeUndefined();
+  });
 });

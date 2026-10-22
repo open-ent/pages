@@ -191,6 +191,7 @@
   "pages.page.url": "Address",
   "pages.editor.cell.drag": "Drag the cell to move it",
   "pages.editor.cell.resize": "Resize the cell",
+  "pages.panel.collapse": "Collapse the panel",
   "pages.panel.title": "Add content",
   "pages.panel.help": "Drag an item onto a cell, or onto an \"Add a row\" strip.",
   "pages.panel.media": "Media",

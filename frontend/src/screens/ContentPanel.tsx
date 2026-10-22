@@ -11,6 +11,8 @@ export type PanelItem =
   | { kind: 'sniplet'; sniplet: Exclude<SnipletKind, 'message' | 'navigation'> }
   | { kind: 'block'; name: string };
 
+const PANEL_KEY = 'pages.editor.panel';
+
 const MEDIA: Array<{ type: 'text' | 'image' | 'video' | 'sound'; key: string; label: string; icon: string }> = [
   { type: 'text', key: 'pages.editor.type.text', label: 'Texte', icon: '✎' },
   { type: 'image', key: 'pages.editor.type.image', label: 'Image', icon: '🖼' },
@@ -25,6 +27,23 @@ const MEDIA: Array<{ type: 'text' | 'image' | 'video' | 'sound'; key: string; la
 export function ContentPanel({ onDragStart, onDragEnd }: { onDragStart: (item: PanelItem) => void; onDragEnd: () => void }) {
   const { t } = useTranslation(['pages', 'common']);
   const [search, setSearch] = useState('');
+  // Panneau repliable (comme l'onglet de l'éditeur historique) ; le choix est retenu d'une visite à l'autre.
+  const [open, setOpen] = useState(() => {
+    try {
+      return window.localStorage.getItem(PANEL_KEY) !== 'closed';
+    } catch {
+      return true;
+    }
+  });
+  const toggle = () =>
+    setOpen((v) => {
+      try {
+        window.localStorage.setItem(PANEL_KEY, v ? 'closed' : 'open');
+      } catch {
+        /* stockage indisponible : le choix vaut pour cette visite */
+      }
+      return !v;
+    });
   const names = useQuery({ queryKey: ['pages', 'block-names'], queryFn: loadBlockNames, retry: false, staleTime: Infinity });
   const blocks: Block[] = (names.data ?? []).map((name) => ({
     name,
@@ -49,9 +68,24 @@ export function ContentPanel({ onDragStart, onDragEnd }: { onDragStart: (item: P
     </div>
   );
 
+  if (!open) {
+    return (
+      <aside className="card p-8" style={{ flex: '0 0 auto', alignSelf: 'flex-start', position: 'sticky', top: 8 }} data-content-panel="closed">
+        <button type="button" className="btn btn-sm btn-outline-primary" aria-expanded={false} onClick={toggle} data-panel-toggle>
+          + {t('pages.panel.title', { defaultValue: 'Ajouter du contenu' })}
+        </button>
+      </aside>
+    );
+  }
+
   return (
     <aside className="card p-12" style={{ width: 260, flex: '0 0 260px', alignSelf: 'flex-start', position: 'sticky', top: 8, maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }} data-content-panel aria-label={t('pages.panel.title', { defaultValue: 'Ajouter du contenu' })}>
-      <h2 style={{ fontSize: 18 }} className="mb-4">{t('pages.panel.title', { defaultValue: 'Ajouter du contenu' })}</h2>
+      <div className="d-flex justify-content-between align-items-start gap-8">
+        <h2 style={{ fontSize: 18 }} className="mb-4">{t('pages.panel.title', { defaultValue: 'Ajouter du contenu' })}</h2>
+        <button type="button" className="btn btn-sm btn-outline-secondary" aria-expanded onClick={toggle} aria-label={t('pages.panel.collapse', { defaultValue: 'Replier le panneau' })} data-panel-toggle>
+          ‹
+        </button>
+      </div>
       <p className="text-muted" style={{ fontSize: 13 }}>{t('pages.panel.help', { defaultValue: 'Glissez un élément sur une cellule, ou sur une bande « Ajouter une ligne ».' })}</p>
 
       <h3 style={{ fontSize: 15 }} className="mb-8">{t('pages.panel.media', { defaultValue: 'Médias' })}</h3>

@@ -126,7 +126,7 @@ export function stripUids(rows: EditRow[]): EditRow[] {
 
 /** Où déposer une cellule : avant/après une autre cellule, ou dans une nouvelle ligne avant/après une ligne. */
 export type DropTarget =
-  | { cellUid: string; side: 'before' | 'after' }
+  | { cellUid: string; side: 'before' | 'after'; /** Élément du panneau déposé au bord : crée une cellule voisine au lieu de remplacer. */ edge?: true }
   | { rowUid: string; side: 'before' | 'after'; newRow: true };
 
 const findCell = (rows: EditRow[], uid: string): { r: number; c: number } | undefined => {
@@ -189,6 +189,30 @@ export function insertEmptyRow(rows: EditRow[], rowUid: string, side: 'before' |
   const next = [...rows];
   next.splice(side === 'before' ? at : at + 1, 0, { _uid: uid(), index: 0, cells: [cell] });
   return { rows: reindex(next), cellUid: cell._uid! };
+}
+
+/**
+ * Insère une cellule vide à côté d'une cellule (avant ou après). Ligne avec des colonnes libres : la nouvelle cellule en
+ * prend jusqu'à 6 ; ligne pleine : la cellule voisine cède la moitié de sa largeur ; cellule d'une seule colonne dans une
+ * ligne pleine : pas de place, la nouvelle cellule prend une ligne juste après. Renvoie la grille et la nouvelle cellule.
+ */
+export function insertEmptyCell(rows: EditRow[], cellUid: string, side: 'before' | 'after'): { rows: EditRow[]; cellUid: string } | undefined {
+  const at = findCell(rows, cellUid);
+  if (!at) return undefined;
+  const row = rows[at.r];
+  const free = remainingColumns(row);
+  if (free < 1 && row.cells[at.c].width < 2) {
+    const cell = emptyCell(MAX_COLUMNS);
+    const next = [...rows];
+    next.splice(at.r + 1, 0, { _uid: uid(), index: 0, cells: [cell] });
+    return { rows: reindex(next), cellUid: cell._uid! };
+  }
+  const target = row.cells[at.c];
+  const width = free >= 1 ? Math.min(free, 6) : Math.floor(target.width / 2);
+  const cell = emptyCell(width);
+  const cells = row.cells.map((x, c) => (c === at.c && free < 1 ? { ...x, width: x.width - width } : x));
+  cells.splice(side === 'before' ? at.c : at.c + 1, 0, cell);
+  return { rows: reindex(rows.map((x, r) => (r === at.r ? { ...x, cells } : x))), cellUid: cell._uid! };
 }
 
 /** Position (ligne, cellule) d'une cellule d'après son identifiant d'affichage ; `undefined` si elle n'existe plus. */

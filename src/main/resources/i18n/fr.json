@@ -198,6 +198,7 @@
   "pages.page.url": "Adresse",
   "pages.editor.cell.drag": "Glisser la cellule pour la déplacer",
   "pages.editor.cell.resize": "Redimensionner la cellule",
+  "pages.panel.collapse": "Replier le panneau",
   "pages.panel.title": "Ajouter du contenu",
   "pages.panel.help": "Glissez un élément sur une cellule, ou sur une bande « Ajouter une ligne ».",
   "pages.panel.media": "Médias",
