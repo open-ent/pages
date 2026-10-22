@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { moveCellTo, resizedWidth, stripUids, addCell, addRow, moveCell, moveRow, normalizeEditRows, remainingColumns, removeCell, removeRow, rowsFromContent, setCellMedia, setCellWidth } from './gridEdit';
+import { insertEmptyRow, locateCell, moveCellTo, resizedWidth, stripUids, addCell, addRow, moveCell, moveRow, normalizeEditRows, remainingColumns, removeCell, removeRow, rowsFromContent, setCellMedia, setCellWidth } from './gridEdit';
 
 const grid = () => stripUids(normalizeEditRows([{ index: 0, cells: [{ index: 0, width: 8 }, { index: 1, width: 3 }] }, { index: 1, cells: [{ index: 0, width: 12 }] }]));
 
@@ -112,4 +112,18 @@ describe('resizedWidth', () => {
     expect(resizedWidth(4, -140, 1200)).toBe(3);
     expect(resizedWidth(4, 30, 0)).toBe(4);
   });
+});
+
+describe('insertEmptyRow / locateCell', () => {
+  const rows = normalizeEditRows([{ index: 0, cells: [{ index: 0, width: 6 }] }, { index: 1, cells: [{ index: 0, width: 12 }] }]);
+  it('insère une ligne vide avant ou après et renvoie sa cellule', () => {
+    const before = insertEmptyRow(rows, rows[1]._uid!, 'before')!;
+    expect(before.rows).toHaveLength(3);
+    expect(before.rows[1].cells[0]).toMatchObject({ width: 12, media: { type: 'empty' }, _uid: before.cellUid });
+    const after = insertEmptyRow(rows, rows[1]._uid!, 'after')!;
+    expect(locateCell(after.rows, after.cellUid)).toEqual({ r: 2, c: 0 });
+    expect(after.rows.map((r) => r.index)).toEqual([0, 1, 2]);
+  });
+  it('ligne inconnue : rien', () => expect(insertEmptyRow(rows, 'inconnue', 'after')).toBeUndefined());
+  it('cellule disparue : introuvable', () => expect(locateCell(rows, 'x')).toBeUndefined());
 });

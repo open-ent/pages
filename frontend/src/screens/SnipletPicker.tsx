@@ -5,21 +5,21 @@ import { useTranslation } from 'react-i18next';
 import { listChoices, SNIPLET_KINDS, SnipletKind, SnipletSource, toSource } from '../sniplets';
 
 /** Choix d'un contenu interactif pour une cellule : type (blog, wiki, forum) puis ressource de l'utilisateur. */
-export function SnipletPicker({ onPick, onCancel }: { onPick: (source: SnipletSource) => void; onCancel: () => void }) {
+export function SnipletPicker({ onPick, onCancel, fixedKind }: { onPick: (source: SnipletSource) => void; onCancel: () => void; fixedKind?: Exclude<SnipletKind, 'message' | 'navigation'> }) {
   const { t } = useTranslation(['pages', 'common']);
-  const [kind, setKind] = useState<Exclude<SnipletKind, 'message' | 'navigation'>>('articles');
+  const [kind, setKind] = useState<Exclude<SnipletKind, 'message' | 'navigation'>>(fixedKind ?? 'articles');
   const [resourceId, setResourceId] = useState('');
   const query = useQuery({ queryKey: ['pages', 'sniplet-choices', kind], queryFn: () => listChoices(kind), retry: false });
   const choices = query.data ?? [];
 
   return (
     <div className="d-flex flex-column gap-8" data-sniplet-picker>
-      <label className="form-label mb-0">
+      {!fixedKind && <label className="form-label mb-0">
         {t('pages.sniplet.kind', { defaultValue: 'Type de contenu' })}
         <select className="form-select form-select-sm" value={kind} onChange={(e) => { setKind(e.target.value as typeof kind); setResourceId(''); }} data-sniplet-kind>
           {SNIPLET_KINDS.map((k) => <option key={k.kind} value={k.kind}>{t(k.labelKey, { defaultValue: k.defaultLabel })}</option>)}
         </select>
-      </label>
+      </label>}
       <label className="form-label mb-0">
         {t('pages.sniplet.resource', { defaultValue: 'Ressource' })}
         <select className="form-select form-select-sm" value={resourceId} onChange={(e) => setResourceId(e.target.value)} data-sniplet-resource disabled={query.isLoading}>

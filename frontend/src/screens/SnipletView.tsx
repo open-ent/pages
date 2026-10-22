@@ -53,6 +53,7 @@ export function SnipletView({ sniplet }: { sniplet: SnipletSource }) {
   if (!kind) {
     return <p className="text-muted mb-0" data-sniplet="unknown">{t('pages.page.sniplet', { defaultValue: "Contenu interactif : à consulter depuis l'ancienne interface." })}</p>;
   }
+  if (!id) return <p className="text-muted mb-0" data-sniplet={kind} data-sniplet-empty>{t('pages.sniplet.noresource', { defaultValue: "Aucune ressource choisie pour ce contenu." })}</p>;
   if (query.isLoading) return <p className="text-muted mb-0" data-sniplet={kind}>{t('pages.loading', { defaultValue: 'Chargement…' })}</p>;
   if (query.isError || !query.data) {
     return <p className="text-muted mb-0" data-sniplet={kind} data-sniplet-error>{t('pages.sniplet.unavailable', { defaultValue: "Ce contenu n'est pas disponible (ressource supprimée ou accès refusé)." })}</p>;

@@ -180,3 +180,18 @@ export function resizedWidth(startWidth: number, deltaPx: number, rowPx: number)
   if (rowPx <= 0) return startWidth;
   return Math.round(startWidth + deltaPx / (rowPx / MAX_COLUMNS));
 }
+
+/** Insère une ligne vide (une cellule vide pleine largeur) avant/après une ligne ; renvoie la grille et l'identifiant de la nouvelle cellule. */
+export function insertEmptyRow(rows: EditRow[], rowUid: string, side: 'before' | 'after'): { rows: EditRow[]; cellUid: string } | undefined {
+  const at = rows.findIndex((row) => row._uid === rowUid);
+  if (at < 0) return undefined;
+  const cell = emptyCell(MAX_COLUMNS);
+  const next = [...rows];
+  next.splice(side === 'before' ? at : at + 1, 0, { _uid: uid(), index: 0, cells: [cell] });
+  return { rows: reindex(next), cellUid: cell._uid! };
+}
+
+/** Position (ligne, cellule) d'une cellule d'après son identifiant d'affichage ; `undefined` si elle n'existe plus. */
+export function locateCell(rows: EditRow[], cellUid: string): { r: number; c: number } | undefined {
+  return findCell(rows, cellUid);
+}

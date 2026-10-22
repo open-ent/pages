@@ -7,13 +7,15 @@ import { Link, useParams } from 'react-router-dom';
 
 import { api, Page } from '../api';
 import {
-  addCell, addRow, DropTarget, EditRow, moveCell, moveCellTo, moveRow, resizedWidth, normalizeEditRows, remainingColumns, removeCell, removeRow, rowsFromContent,
+  addCell, addRow, DropTarget, EditRow, insertEmptyRow, locateCell, moveCell, moveCellTo, moveRow, resizedWidth, normalizeEditRows, remainingColumns, removeCell, removeRow, rowsFromContent,
   setCellMedia, setCellTitle, setCellWidth, stripUids,
 } from '../gridEdit';
 import { sanitizeHtml } from '../sanitize';
-import { kindOf, SnipletSource } from '../sniplets';
+import { kindOf, SNIPLET_KINDS, SnipletSource, SnipletKind } from '../sniplets';
 import { canUpdateSite, HEAVY_PAGE_WEIGHT, isGridPage, isPagePublished, pageWeight } from '../utils';
 import { BlockPicker } from './BlockPicker';
+import { ContentPanel, PanelItem } from './ContentPanel';
+import { loadBlockHtml } from '../blocks';
 import { SnipletPicker } from './SnipletPicker';
 import { PageStyle } from './PageStyle';
 import { SiteContext } from './SiteContext';
@@ -140,14 +142,50 @@ export function PageEditor() {
   const onLibraryCancel = () => { library.current?.hide(); setTarget(null); };
 
   // Glisser-déposer d'une cellule : cellule glissée et zone survolée (avant/après une cellule, ou nouvelle ligne)
-  const [dragUid, setDragUid] = useState<string | null>(null);
+  const [drag, setDrag] = useState<({ kind: 'cell'; uid: string } | PanelItem) | null>(null);
+  const dragUid = drag?.kind === 'cell' ? drag.uid : null;
   const [hover, setHover] = useState<string | null>(null);
   const gridRef = useRef<EditRow[]>([]);
   const hoverKey = (target: DropTarget) => ('cellUid' in target ? `c:${target.cellUid}:${target.side}` : `r:${target.rowUid}:${target.side}`);
+  /** Applique un élément du panneau à une cellule (son contenu est remplacé). */
+  const applyItem = async (base: EditRow[], cellUid: string, item: PanelItem) => {
+    const at = locateCell(base, cellUid);
+    if (!at) return;
+    if (item.kind === 'media' && item.type === 'text') change(setCellMedia(base, at.r, at.c, { type: 'text', source: '' }));
+    else if (item.kind === 'media') {
+      // Image, vidéo, son : la cellule est vidée puis la médiathèque s'ouvre pour le choix du fichier
+      change(setCellMedia(base, at.r, at.c, { type: 'empty' }));
+      pick(at.r, at.c, item.type === 'sound' ? 'audio' : (item.type as 'image' | 'video'));
+    } else if (item.kind === 'sniplet') {
+      const def = SNIPLET_KINDS.find((k) => k.kind === item.sniplet)!;
+      change(setCellMedia(base, at.r, at.c, { type: 'sniplet', source: { application: def.application, template: def.template } }));
+    } else {
+      try { change(setCellMedia(base, at.r, at.c, { type: 'text', source: await loadBlockHtml(item.name) })); } catch { setState('error'); }
+    }
+  };
+  /** Dépôt : cellule déplacée, ou élément du panneau (sur une cellule ou une bande « Ajouter une ligne »). */
+  /** Bande « Ajouter une ligne » entre les lignes : discrète au repos, surlignée sous le curseur pendant un glisser. */
+  const bandStyle = (key: string) => ({
+    minHeight: 22,
+    borderRadius: 4,
+    textAlign: 'center' as const,
+    fontSize: 12,
+    lineHeight: '22px',
+    color: hover === key ? '#fff' : '#6c757d',
+    border: `1px dashed ${hover === key ? '#4bafd5' : drag ? '#adb5bd' : '#dee2e6'}`,
+    background: hover === key ? '#4bafd5' : drag ? '#f1f3f5' : 'transparent',
+  });
+  const bandLabel = (key: string) => (hover === key ? t('pages.editor.row.add', { defaultValue: 'Ajouter une ligne' }) : '+');
   const dropOn = (target: DropTarget) => {
-    if (dragUid && rows) change(moveCellTo(rows, dragUid, target));
-    setDragUid(null);
+    const item = drag;
+    setDrag(null);
     setHover(null);
+    if (!item || !rows) return;
+    if (item.kind === 'cell') { change(moveCellTo(rows, item.uid, target)); return; }
+    if ('newRow' in target) {
+      const inserted = insertEmptyRow(rows, target.rowUid, target.side);
+      if (inserted) void applyItem(inserted.rows, inserted.cellUid, item);
+    } else void applyItem(rows, target.cellUid, item);
   };
   /** Redimensionnement à la souris : la poignée du bord droit convertit le glissement en colonnes de la ligne. */
   const startResize = (e: React.PointerEvent<HTMLElement>, r: number, c: number) => {
@@ -204,6 +242,8 @@ export function PageEditor() {
         </div>
       </div>
 
+      <div className="d-flex gap-16 flex-wrap align-items-start">
+      <div style={{ flex: '1 1 520px', minWidth: 0 }}>
       {pageWeight(grid) > HEAVY_PAGE_WEIGHT && (
         <div className="alert alert-warning" role="alert" data-page-heavy>{t('page.warning.heavy', { defaultValue: "Cette page utilise beaucoup de contenu. Elle risque d'être longue à télécharger si le réseau est lent." })}</div>
       )}
@@ -217,11 +257,11 @@ export function PageEditor() {
         {(
           <div
             className="mb-4"
-            style={{ height: 10, background: hover === hoverKey({ rowUid: row._uid ?? '', side: 'before', newRow: true }) ? '#4bafd5' : dragUid ? '#e9ecef' : 'transparent', borderRadius: 4 }}
+            style={bandStyle(hoverKey({ rowUid: row._uid ?? '', side: 'before', newRow: true }))}
             onDragOver={(e) => { e.preventDefault(); setHover(hoverKey({ rowUid: row._uid ?? '', side: 'before', newRow: true })); }}
             onDrop={(e) => { e.preventDefault(); dropOn({ rowUid: row._uid ?? '', side: 'before', newRow: true }); }}
             data-row-drop
-          />
+          >{bandLabel(hoverKey({ rowUid: row._uid ?? '', side: 'before', newRow: true }))}</div>
         )}
         <div className="card p-12 mb-12" data-editor-row>
           <div className="d-flex gap-8 mb-8 flex-wrap">
@@ -243,14 +283,14 @@ export function PageEditor() {
                   data-editor-cell
                   data-cell-type={type ?? 'empty'}
                   onDragOver={(e) => {
-                    if (!dragUid || dragUid === cell._uid) return;
+                    if (!drag || dragUid === cell._uid) return;
                     e.preventDefault();
                     const box = e.currentTarget.getBoundingClientRect();
                     setHover(hoverKey({ cellUid: cell._uid ?? '', side: e.clientX < box.left + box.width / 2 ? 'before' : 'after' }));
                   }}
                   onDragLeave={() => setHover(null)}
                   onDrop={(e) => {
-                    if (!dragUid) return;
+                    if (!drag) return;
                     e.preventDefault();
                     const box = e.currentTarget.getBoundingClientRect();
                     dropOn({ cellUid: cell._uid ?? '', side: e.clientX < box.left + box.width / 2 ? 'before' : 'after' });
@@ -264,8 +304,8 @@ export function PageEditor() {
                       aria-label={t('pages.editor.cell.drag', { defaultValue: 'Glisser la cellule pour la déplacer' })}
                       title={t('pages.editor.cell.drag', { defaultValue: 'Glisser la cellule pour la déplacer' })}
                       style={{ cursor: 'grab', userSelect: 'none' }}
-                      onDragStart={(e) => { e.dataTransfer.setData('text/plain', cell._uid ?? ''); e.dataTransfer.effectAllowed = 'move'; const uid = cell._uid ?? null; setTimeout(() => setDragUid(uid), 0); }}
-                      onDragEnd={() => { setDragUid(null); setHover(null); }}
+                      onDragStart={(e) => { e.dataTransfer.setData('text/plain', cell._uid ?? ''); e.dataTransfer.effectAllowed = 'move'; const uid = cell._uid ?? ''; setTimeout(() => setDrag({ kind: 'cell', uid }), 0); }}
+                      onDragEnd={() => { setDrag(null); setHover(null); }}
                       data-drag-handle
                     >⠿</span>
                     <button type="button" className="btn btn-link p-0" aria-label={t('pages.editor.cell.left', { defaultValue: 'Déplacer la cellule à gauche' })} disabled={c === 0} onClick={() => change(moveCell(grid, r, c, -1))}>←</button>
@@ -279,6 +319,9 @@ export function PageEditor() {
                     <button type="button" className="btn btn-link p-0 text-danger ms-auto" onClick={() => { if (window.confirm(t('pages.editor.cell.confirm', { defaultValue: 'Supprimer cette cellule et son contenu ?' }))) change(removeCell(grid, r, c)); }}>{t('pages.editor.cell.delete', { defaultValue: 'Supprimer' })}</button>
                   </div>
 
+                  {(!type || type === 'empty') && (
+                    <p className="text-muted mb-8" style={{ fontSize: 13 }} data-cell-help>{t('pages.editor.cell.help', { defaultValue: 'Glissez un contenu depuis le panneau « Ajouter du contenu », ou choisissez-le ci-dessous.' })}</p>
+                  )}
                   {(!type || type === 'empty') && (
                     <div className="d-flex gap-8 flex-wrap" data-cell-choose>
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => change(setCellMedia(grid, r, c, { type: 'text', source: '' }))}>{t('pages.editor.type.text', { defaultValue: 'Texte' })}</button>
@@ -331,7 +374,16 @@ export function PageEditor() {
                       <button type="button" className="btn btn-link p-0 d-block" onClick={() => pick(r, c, 'video')}>{t('pages.editor.change', { defaultValue: 'Choisir un autre média' })}</button>
                     </div>
                   )}
-                  {type === 'sniplet' && kindOf(cell.media?.source as SnipletSource | undefined) && (
+                  {type === 'sniplet' && ['articles', 'wiki', 'forum'].includes(kindOf(cell.media?.source as SnipletSource | undefined) ?? '') && !(cell.media?.source as SnipletSource | undefined)?.source?._id && (
+                    <div data-cell-sniplet-pick>
+                      <SnipletPicker
+                        fixedKind={kindOf(cell.media?.source as SnipletSource) as 'articles' | 'wiki' | 'forum'}
+                        onPick={(src: SnipletSource) => change(setCellMedia(grid, r, c, { type: 'sniplet', source: src }))}
+                        onCancel={() => change(setCellMedia(grid, r, c, { type: 'empty' }))}
+                      />
+                    </div>
+                  )}
+                  {type === 'sniplet' && kindOf(cell.media?.source as SnipletSource | undefined) && (cell.media?.source as SnipletSource | undefined)?.source?._id && (
                     <div data-cell-sniplet>
                       <SnipletView sniplet={cell.media!.source as SnipletSource} />
                       <button type="button" className="btn btn-link p-0 d-block" onClick={() => change(setCellMedia(grid, r, c, { type: 'empty' }))}>{t('pages.editor.sniplet.reset', { defaultValue: 'Changer de contenu' })}</button>
@@ -362,14 +414,18 @@ export function PageEditor() {
       {grid.length > 0 && (
         <div
           className="mb-8"
-          style={{ height: 10, background: hover === hoverKey({ rowUid: grid[grid.length - 1]._uid ?? '', side: 'after', newRow: true }) ? '#4bafd5' : dragUid ? '#e9ecef' : 'transparent', borderRadius: 4 }}
+          style={bandStyle(hoverKey({ rowUid: grid[grid.length - 1]._uid ?? '', side: 'after', newRow: true }))}
           onDragOver={(e) => { e.preventDefault(); setHover(hoverKey({ rowUid: grid[grid.length - 1]._uid ?? '', side: 'after', newRow: true })); }}
           onDrop={(e) => { e.preventDefault(); dropOn({ rowUid: grid[grid.length - 1]._uid ?? '', side: 'after', newRow: true }); }}
           data-row-drop
-        />
+        >{bandLabel(hoverKey({ rowUid: grid[grid.length - 1]._uid ?? '', side: 'after', newRow: true }))}</div>
       )}
 
       <button type="button" className="btn btn-primary" onClick={() => change(addRow(grid))} data-add-row>{t('pages.editor.row.add', { defaultValue: 'Ajouter une ligne' })}</button>
+
+      </div>
+      <ContentPanel onDragStart={(item) => setDrag(item)} onDragEnd={() => { setDrag(null); setHover(null); }} />
+      </div>
 
       <MediaLibrary ref={library} appCode={appCode} visibility={site.visibility === 'PUBLIC' ? 'public' : 'protected'} onSuccess={onLibrarySuccess} onCancel={onLibraryCancel} />
     </div>
