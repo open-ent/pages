@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { stripUids, addCell, addRow, moveCell, moveRow, normalizeEditRows, remainingColumns, removeCell, removeRow, rowsFromContent, setCellMedia, setCellWidth } from './gridEdit';
+import { moveCellTo, resizedWidth, stripUids, addCell, addRow, moveCell, moveRow, normalizeEditRows, remainingColumns, removeCell, removeRow, rowsFromContent, setCellMedia, setCellWidth } from './gridEdit';
 
 const grid = () => stripUids(normalizeEditRows([{ index: 0, cells: [{ index: 0, width: 8 }, { index: 1, width: 3 }] }, { index: 1, cells: [{ index: 0, width: 12 }] }]));
 
@@ -59,4 +59,57 @@ describe('cellules', () => {
 describe('rowsFromContent', () => {
   it('page simple → une cellule texte', () => expect(rowsFromContent('<p>a</p>')[0].cells[0].media).toEqual({ type: 'text', source: '<p>a</p>' }));
   it('contenu vide → rien', () => expect(rowsFromContent('  ')).toEqual([]));
+});
+
+describe('moveCellTo', () => {
+  // Ligne 0 : A(4) B(4) ; ligne 1 : C(12, pleine) ; ligne 2 : D(4)
+  const make = () => {
+    const rows = normalizeEditRows([
+      { index: 0, cells: [{ index: 0, width: 4, title: 'A' }, { index: 1, width: 4, title: 'B' }] },
+      { index: 1, cells: [{ index: 0, width: 12, title: 'C' }] },
+      { index: 2, cells: [{ index: 0, width: 4, title: 'D' }] },
+    ]);
+    const uidOf = (title: string) => rows.flatMap((r) => r.cells).find((c) => c.title === title)!._uid!;
+    const titles = (g: ReturnType<typeof normalizeEditRows>) => g.map((r) => r.cells.map((c) => `${c.title}${c.width}`));
+    return { rows, uidOf, titles };
+  };
+  it('réordonne dans la même ligne', () => {
+    const { rows, uidOf, titles } = make();
+    expect(titles(moveCellTo(rows, uidOf('A'), { cellUid: uidOf('B'), side: 'after' }))[0]).toEqual(['B4', 'A4']);
+  });
+  it('change de ligne : la ligne vidée disparaît', () => {
+    const { rows, uidOf, titles } = make();
+    expect(titles(moveCellTo(rows, uidOf('D'), { cellUid: uidOf('A'), side: 'before' }))).toEqual([['D4', 'A4', 'B4'], ['C12']]);
+  });
+  it('réduit la largeur aux colonnes libres de la ligne cible', () => {
+    const { rows, uidOf, titles } = make();
+    const wide = normalizeEditRows([{ index: 0, cells: [{ index: 0, width: 8, title: 'X' }] }, { index: 1, cells: [{ index: 0, width: 10, title: 'Y' }] }]);
+    const y = wide[1].cells[0]._uid!;
+    expect(titles(moveCellTo(wide, y, { cellUid: wide[0].cells[0]._uid!, side: 'after' }))).toEqual([['X8', 'Y4']]);
+    expect(rows).toHaveLength(3);
+    expect(uidOf('A')).toBeTruthy();
+  });
+  it('ligne pleine : nouvelle ligne juste après, pleine largeur', () => {
+    const { rows, uidOf, titles } = make();
+    expect(titles(moveCellTo(rows, uidOf('A'), { cellUid: uidOf('C'), side: 'before' }))).toEqual([['B4'], ['C12'], ['A12'], ['D4']]);
+  });
+  it('zone entre les lignes : nouvelle ligne pleine largeur', () => {
+    const { rows, uidOf, titles } = make();
+    const out = moveCellTo(rows, uidOf('D'), { rowUid: rows[0]._uid!, side: 'before', newRow: true });
+    expect(titles(out)).toEqual([['D12'], ['A4', 'B4'], ['C12']]);
+  });
+  it('cible identique ou inconnue : sans effet', () => {
+    const { rows, uidOf } = make();
+    expect(moveCellTo(rows, uidOf('A'), { cellUid: uidOf('A'), side: 'after' })).toBe(rows);
+    expect(moveCellTo(rows, uidOf('A'), { cellUid: 'inconnue', side: 'after' })).toBe(rows);
+    expect(moveCellTo(rows, 'inconnue', { cellUid: uidOf('A'), side: 'after' })).toBe(rows);
+  });
+});
+
+describe('resizedWidth', () => {
+  it('convertit un glissement en colonnes (ligne de 1200 px → 100 px par colonne)', () => {
+    expect(resizedWidth(4, 200, 1200)).toBe(6);
+    expect(resizedWidth(4, -140, 1200)).toBe(3);
+    expect(resizedWidth(4, 30, 0)).toBe(4);
+  });
 });

@@ -7,7 +7,7 @@ import { Link, useParams } from 'react-router-dom';
 
 import { api, Page } from '../api';
 import {
-  addCell, addRow, EditRow, moveCell, moveRow, normalizeEditRows, remainingColumns, removeCell, removeRow, rowsFromContent,
+  addCell, addRow, DropTarget, EditRow, moveCell, moveCellTo, moveRow, resizedWidth, normalizeEditRows, remainingColumns, removeCell, removeRow, rowsFromContent,
   setCellMedia, setCellTitle, setCellWidth, stripUids,
 } from '../gridEdit';
 import { sanitizeHtml } from '../sanitize';
@@ -139,6 +139,36 @@ export function PageEditor() {
   };
   const onLibraryCancel = () => { library.current?.hide(); setTarget(null); };
 
+  // Glisser-déposer d'une cellule : cellule glissée et zone survolée (avant/après une cellule, ou nouvelle ligne)
+  const [dragUid, setDragUid] = useState<string | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
+  const gridRef = useRef<EditRow[]>([]);
+  const hoverKey = (target: DropTarget) => ('cellUid' in target ? `c:${target.cellUid}:${target.side}` : `r:${target.rowUid}:${target.side}`);
+  const dropOn = (target: DropTarget) => {
+    if (dragUid && rows) change(moveCellTo(rows, dragUid, target));
+    setDragUid(null);
+    setHover(null);
+  };
+  /** Redimensionnement à la souris : la poignée du bord droit convertit le glissement en colonnes de la ligne. */
+  const startResize = (e: React.PointerEvent<HTMLElement>, r: number, c: number) => {
+    const rowEl = e.currentTarget.closest('[data-row-grid]') as HTMLElement | null;
+    if (!rowEl) return;
+    e.preventDefault();
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    const startX = e.clientX;
+    const startWidth = gridRef.current[r]?.cells[c]?.width ?? 1;
+    const rowPx = rowEl.getBoundingClientRect().width;
+    const move = (ev: PointerEvent) => {
+      const next = setCellWidth(gridRef.current, r, c, resizedWidth(startWidth, ev.clientX - startX, rowPx));
+      if (next !== gridRef.current) { gridRef.current = next; change(next); }
+    };
+    const up = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up); };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
+  };
+
   // Cellule en cours de choix d'un contenu interactif
   const [pickingUid, setPickingUid] = useState<string | null>(null);
   // Cellule en cours de choix d'un bloc modèle
@@ -152,6 +182,7 @@ export function PageEditor() {
   // Grille pas encore initialisée depuis la page : on n'affiche rien d'éditable (un clic précoce écraserait la grille)
   if (rows === null) return <p>{t('pages.loading', { defaultValue: 'Chargement…' })}</p>;
   const grid = rows;
+  gridRef.current = grid;
 
   return (
     <SiteContext.Provider value={{ siteId }}>
@@ -182,21 +213,61 @@ export function PageEditor() {
       {grid.length === 0 && <p className="text-muted" data-editor-empty>{t('pages.editor.empty', { defaultValue: 'Cette page est vide. Ajoutez une ligne pour commencer.' })}</p>}
 
       {grid.map((row, r) => (
-        <div key={row._uid ?? r} className="card p-12 mb-12" data-editor-row>
+        <div key={row._uid ?? r}>
+        {(
+          <div
+            className="mb-4"
+            style={{ height: 10, background: hover === hoverKey({ rowUid: row._uid ?? '', side: 'before', newRow: true }) ? '#4bafd5' : dragUid ? '#e9ecef' : 'transparent', borderRadius: 4 }}
+            onDragOver={(e) => { e.preventDefault(); setHover(hoverKey({ rowUid: row._uid ?? '', side: 'before', newRow: true })); }}
+            onDrop={(e) => { e.preventDefault(); dropOn({ rowUid: row._uid ?? '', side: 'before', newRow: true }); }}
+            data-row-drop
+          />
+        )}
+        <div className="card p-12 mb-12" data-editor-row>
           <div className="d-flex gap-8 mb-8 flex-wrap">
             <button type="button" className="btn btn-link p-0" aria-label={`${t('pages.editor.row.up', { defaultValue: 'Monter la ligne' })} ${r + 1}`} disabled={r === 0} onClick={() => change(moveRow(grid, r, -1))}>↑</button>
             <button type="button" className="btn btn-link p-0" aria-label={`${t('pages.editor.row.down', { defaultValue: 'Descendre la ligne' })} ${r + 1}`} disabled={r === grid.length - 1} onClick={() => change(moveRow(grid, r, 1))}>↓</button>
             <button type="button" className="btn btn-link p-0" disabled={remainingColumns(row) < 1} onClick={() => change(addCell(grid, r))} data-add-cell>{t('pages.editor.cell.add', { defaultValue: 'Ajouter une cellule' })}</button>
             <button type="button" className="btn btn-link p-0 text-danger" onClick={() => { if (window.confirm(t('pages.editor.row.confirm', { defaultValue: 'Supprimer cette ligne et son contenu ?' }))) change(removeRow(grid, r)); }}>{t('pages.editor.row.delete', { defaultValue: 'Supprimer la ligne' })}</button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gap: 12 }} data-row-grid>
             {row.cells.map((cell, c) => {
               const type = cell.media?.type;
               const source = typeof cell.media?.source === 'string' ? cell.media.source : '';
               const max = cell.width + remainingColumns(row);
               return (
-                <div key={cell._uid ?? c} className="border rounded p-8" style={{ gridColumn: `span ${cell.width}` }} data-editor-cell data-cell-type={type ?? 'empty'}>
+                <div
+                  key={cell._uid ?? c}
+                  className="border rounded p-8 position-relative"
+                  style={{ gridColumn: `span ${cell.width}`, ...(hover?.startsWith(`c:${cell._uid}:`) ? { boxShadow: `${hover.endsWith(':before') ? '-' : ''}4px 0 0 #4bafd5` } : {}) }}
+                  data-editor-cell
+                  data-cell-type={type ?? 'empty'}
+                  onDragOver={(e) => {
+                    if (!dragUid || dragUid === cell._uid) return;
+                    e.preventDefault();
+                    const box = e.currentTarget.getBoundingClientRect();
+                    setHover(hoverKey({ cellUid: cell._uid ?? '', side: e.clientX < box.left + box.width / 2 ? 'before' : 'after' }));
+                  }}
+                  onDragLeave={() => setHover(null)}
+                  onDrop={(e) => {
+                    if (!dragUid) return;
+                    e.preventDefault();
+                    const box = e.currentTarget.getBoundingClientRect();
+                    dropOn({ cellUid: cell._uid ?? '', side: e.clientX < box.left + box.width / 2 ? 'before' : 'after' });
+                  }}
+                >
                   <div className="d-flex gap-8 align-items-center mb-8 flex-wrap">
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      draggable
+                      aria-label={t('pages.editor.cell.drag', { defaultValue: 'Glisser la cellule pour la déplacer' })}
+                      title={t('pages.editor.cell.drag', { defaultValue: 'Glisser la cellule pour la déplacer' })}
+                      style={{ cursor: 'grab', userSelect: 'none' }}
+                      onDragStart={(e) => { e.dataTransfer.setData('text/plain', cell._uid ?? ''); e.dataTransfer.effectAllowed = 'move'; const uid = cell._uid ?? null; setTimeout(() => setDragUid(uid), 0); }}
+                      onDragEnd={() => { setDragUid(null); setHover(null); }}
+                      data-drag-handle
+                    >⠿</span>
                     <button type="button" className="btn btn-link p-0" aria-label={t('pages.editor.cell.left', { defaultValue: 'Déplacer la cellule à gauche' })} disabled={c === 0} onClick={() => change(moveCell(grid, r, c, -1))}>←</button>
                     <button type="button" className="btn btn-link p-0" aria-label={t('pages.editor.cell.right', { defaultValue: 'Déplacer la cellule à droite' })} disabled={c === row.cells.length - 1} onClick={() => change(moveCell(grid, r, c, 1))}>→</button>
                     <label className="d-flex align-items-center gap-4 mb-0" style={{ fontSize: 13 }}>
@@ -269,6 +340,15 @@ export function PageEditor() {
                   {type && !['empty', 'text', 'image', 'sound', 'video'].includes(type) && !(type === 'sniplet' && kindOf(cell.media?.source as SnipletSource | undefined)) && (
                     <p className="text-muted mb-0" data-cell-readonly>{t('pages.editor.readonly', { defaultValue: "Contenu interactif : non modifiable ici, il est conservé tel quel." })}</p>
                   )}
+                  <span
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label={t('pages.editor.cell.resize', { defaultValue: 'Redimensionner la cellule' })}
+                    title={t('pages.editor.cell.resize', { defaultValue: 'Redimensionner la cellule' })}
+                    style={{ position: 'absolute', top: 0, right: -3, bottom: 0, width: 8, cursor: 'col-resize', touchAction: 'none' }}
+                    onPointerDown={(e) => startResize(e, r, c)}
+                    data-cell-resize
+                  />
                   {type && type !== 'empty' && (
                     <input type="text" className="form-control form-control-sm mt-8" aria-label={t('pages.editor.cell.title', { defaultValue: 'Titre de la cellule' })} placeholder={t('pages.editor.cell.title', { defaultValue: 'Titre de la cellule' })} value={cell.title ?? ''} onChange={(e) => change(setCellTitle(grid, r, c, e.target.value))} />
                   )}
@@ -277,7 +357,17 @@ export function PageEditor() {
             })}
           </div>
         </div>
+        </div>
       ))}
+      {grid.length > 0 && (
+        <div
+          className="mb-8"
+          style={{ height: 10, background: hover === hoverKey({ rowUid: grid[grid.length - 1]._uid ?? '', side: 'after', newRow: true }) ? '#4bafd5' : dragUid ? '#e9ecef' : 'transparent', borderRadius: 4 }}
+          onDragOver={(e) => { e.preventDefault(); setHover(hoverKey({ rowUid: grid[grid.length - 1]._uid ?? '', side: 'after', newRow: true })); }}
+          onDrop={(e) => { e.preventDefault(); dropOn({ rowUid: grid[grid.length - 1]._uid ?? '', side: 'after', newRow: true }); }}
+          data-row-drop
+        />
+      )}
 
       <button type="button" className="btn btn-primary" onClick={() => change(addRow(grid))} data-add-row>{t('pages.editor.row.add', { defaultValue: 'Ajouter une ligne' })}</button>
 

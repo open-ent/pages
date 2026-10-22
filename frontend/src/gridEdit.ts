@@ -123,3 +123,60 @@ export function rowsFromContent(content?: string): EditRow[] {
 export function stripUids(rows: EditRow[]): EditRow[] {
   return rows.map(({ _uid, ...row }) => ({ ...row, cells: row.cells.map(({ _uid: _cell, ...cell }) => cell) })) as EditRow[];
 }
+
+/** Où déposer une cellule : avant/après une autre cellule, ou dans une nouvelle ligne avant/après une ligne. */
+export type DropTarget =
+  | { cellUid: string; side: 'before' | 'after' }
+  | { rowUid: string; side: 'before' | 'after'; newRow: true };
+
+const findCell = (rows: EditRow[], uid: string): { r: number; c: number } | undefined => {
+  for (let r = 0; r < rows.length; r++) {
+    const c = rows[r].cells.findIndex((x) => x._uid === uid);
+    if (c >= 0) return { r, c };
+  }
+  return undefined;
+};
+
+/**
+ * Déplace une cellule par glisser-déposer. Cellule cible : elle s'insère avant ou après, dans la ligne de la cible ; si
+ * la ligne manque de place, sa largeur est réduite aux colonnes libres, et si la ligne est pleine elle prend une nouvelle
+ * ligne juste après. Zone entre les lignes : nouvelle ligne pleine largeur. Une ligne vidée disparaît. Cible introuvable
+ * ou identique à la cellule : sans effet.
+ */
+export function moveCellTo(rows: EditRow[], cellUid: string, target: DropTarget): EditRow[] {
+  const from = findCell(rows, cellUid);
+  if (!from) return rows;
+  if ('cellUid' in target && target.cellUid === cellUid) return rows;
+  const moving = rows[from.r].cells[from.c];
+  const rest = rows.map((row, r) => (r === from.r ? { ...row, cells: row.cells.filter((_, c) => c !== from.c) } : row));
+
+  if ('newRow' in target) {
+    const at = rest.findIndex((row) => row._uid === target.rowUid);
+    if (at < 0) return rows;
+    const inserted: EditRow = { _uid: uid(), index: 0, cells: [{ ...moving, width: MAX_COLUMNS }] };
+    const next = [...rest];
+    next.splice(target.side === 'before' ? at : at + 1, 0, inserted);
+    return reindex(next.filter((row) => row.cells.length > 0));
+  }
+
+  const to = findCell(rest, target.cellUid);
+  if (!to) return rows;
+  const targetRow = rest[to.r];
+  const free = remainingColumns(targetRow);
+  if (free < 1) {
+    // Ligne pleine : la cellule prend une nouvelle ligne juste après
+    const next = [...rest];
+    next.splice(to.r + 1, 0, { _uid: uid(), index: 0, cells: [{ ...moving, width: MAX_COLUMNS }] });
+    return reindex(next.filter((row) => row.cells.length > 0));
+  }
+  const placed = { ...moving, width: Math.min(moving.width, free) };
+  const cells = [...targetRow.cells];
+  cells.splice(target.side === 'before' ? to.c : to.c + 1, 0, placed);
+  return reindex(rest.map((row, r) => (r === to.r ? { ...row, cells } : row)).filter((row) => row.cells.length > 0));
+}
+
+/** Largeur (en colonnes) correspondant à un glissement horizontal de `deltaPx` depuis la largeur d'origine, sur une ligne de `rowPx` pixels. */
+export function resizedWidth(startWidth: number, deltaPx: number, rowPx: number): number {
+  if (rowPx <= 0) return startWidth;
+  return Math.round(startWidth + deltaPx / (rowPx / MAX_COLUMNS));
+}

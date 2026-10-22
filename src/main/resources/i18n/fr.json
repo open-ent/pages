@@ -196,6 +196,8 @@
   "pages.style.sample.text": "Voici un exemple de paragraphe avec du texte",
   "pages.style.sample.and": "et",
   "pages.page.url": "Adresse",
+  "pages.editor.cell.drag": "Glisser la cellule pour la déplacer",
+  "pages.editor.cell.resize": "Redimensionner la cellule",
   "pages.publish.title": "Afficher dans les applications",
   "pages.push.notif.shared.body": "{0} vous a partagé une page",
   "pages.share.varyingrights": "Attention, vous allez modifier des droits de partage sur plusieurs projets : tous les projets sélectionnés seront affectés et disposeront uniquement du nouveau partage.",

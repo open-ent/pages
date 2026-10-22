@@ -189,6 +189,8 @@
   "pages.style.sample.text": "This is a sample paragraph with some text",
   "pages.style.sample.and": "and",
   "pages.page.url": "Address",
+  "pages.editor.cell.drag": "Drag the cell to move it",
+  "pages.editor.cell.resize": "Resize the cell",
   "pages.publish.title": "Show in the apps",
   "pages.push.notif.shared.body": "{0} shared a page with you",
   "pages.share.varyingrights": "Warning: you are about to change sharing rights on several sites. All selected sites will be affected and will only have the new sharing settings.",
