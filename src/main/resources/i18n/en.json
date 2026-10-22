@@ -198,6 +198,8 @@
   "pages.panel.blocks": "Block templates",
   "pages.editor.cell.help": "Drag content from the \"Add content\" panel, or choose it below.",
   "pages.sniplet.noresource": "No resource chosen for this content.",
+  "pages.editor.pending": "Changes waiting to be saved…",
+  "pages.editor.save": "Save",
   "pages.publish.title": "Show in the apps",
   "pages.push.notif.shared.body": "{0} shared a page with you",
   "pages.share.varyingrights": "Warning: you are about to change sharing rights on several sites. All selected sites will be affected and will only have the new sharing settings.",

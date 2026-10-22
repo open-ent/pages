@@ -80,7 +80,7 @@ export function PageEditor() {
   // Style SASS de la page (édité dans le panneau « Style »)
   const [sass, setSass] = useState<string | null>(null);
   const [showStyle, setShowStyle] = useState(false);
-  const [state, setState] = useState<'saved' | 'saving' | 'error'>('saved');
+  const [state, setState] = useState<'saved' | 'pending' | 'saving' | 'error'>('saved');
   const dirty = useRef(false);
   useEffect(() => {
     if (page && rows === null) {
@@ -101,19 +101,42 @@ export function PageEditor() {
     onSuccess: async () => { setState('saved'); await qc.invalidateQueries({ queryKey: siteKey }); },
     onError: () => setState('error'),
   });
-  const change = (next: EditRow[]) => { dirty.current = true; setRows(next); };
-  const changeSass = (next: string) => { dirty.current = true; setSass(next); };
+  const change = (next: EditRow[]) => { dirty.current = true; setState('pending'); setRows(next); };
+  const changeSass = (next: string) => { dirty.current = true; setState('pending'); setSass(next); };
   /** Texte saisi dans une cellule, retrouvée par son identifiant (sa position peut avoir changé entre-temps). */
   const setText = (uid: string, html: string) => {
     dirty.current = true;
+    setState('pending');
     setRows((prev) => (prev ?? []).map((row) => ({ ...row, cells: row.cells.map((cell) => (cell._uid === uid && cell.media?.type === 'text' ? { ...cell, media: { type: 'text', source: html } } : cell)) })));
   };
   const mutate = saveMut.mutate;
+  // Dernier état à enregistrer : sert à l'enregistrement immédiat (bouton, changement d'écran, fermeture de l'onglet)
+  const latest = useRef<{ rows: EditRow[]; sass: string } | null>(null);
+  latest.current = rows === null ? null : { rows, sass: sass ?? '' };
   useEffect(() => {
     if (!dirty.current || rows === null) return;
     const timer = setTimeout(() => { dirty.current = false; mutate({ rows, sass: sass ?? '' }); }, AUTOSAVE_DELAY_MS);
     return () => clearTimeout(timer);
   }, [rows, sass, mutate]);
+  /** Enregistre tout de suite ce qui est en attente (au lieu d'attendre le délai de l'enregistrement automatique). */
+  const saveNow = () => {
+    if (dirty.current && latest.current) { dirty.current = false; mutate(latest.current); }
+  };
+  // Quitter l'éditeur dans le délai de l'enregistrement automatique ne doit pas perdre la dernière modification
+  useEffect(() => () => {
+    const current = latestSite.current;
+    if (dirty.current && latest.current && current) {
+      dirty.current = false;
+      const pages = (current.pages ?? []).map((p) => (p.titleLink === pageLink ? { ...p, rows: stripUids(latest.current!.rows), sass: latest.current!.sass } : p));
+      void api.updateWebsite(siteId, { title: current.title, description: current.description, pages });
+    }
+  }, [siteId, pageLink]);
+  // Fermeture ou rechargement de l'onglet avec une modification non enregistrée : le navigateur prévient
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => { if (dirty.current) { e.preventDefault(); e.returnValue = ''; } };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, []);
 
   const publishMut = useMutation({
     mutationFn: async () => {
@@ -230,10 +253,12 @@ export function PageEditor() {
         <h1 className="mb-0">{page.title}</h1>
         <div className="d-flex align-items-center gap-8">
           <span role="status" className="text-muted" style={{ fontSize: 13 }} data-save-state={state}>
+            {state === 'pending' && t('pages.editor.pending', { defaultValue: 'Modifications en attente d\'enregistrement…' })}
             {state === 'saving' && t('pages.editor.saving', { defaultValue: 'Enregistrement…' })}
             {state === 'saved' && t('pages.editor.saved', { defaultValue: 'Enregistré' })}
             {state === 'error' && t('pages.editor.error', { defaultValue: "L'enregistrement a échoué" })}
           </span>
+          <button type="button" className="btn btn-primary" onClick={saveNow} disabled={state !== 'pending' && state !== 'error'} data-save-now>{t('pages.editor.save', { defaultValue: 'Enregistrer' })}</button>
           <button type="button" className="btn btn-secondary" onClick={() => publishMut.mutate()} disabled={publishMut.isPending} data-publish-toggle>
             {isPagePublished(page) ? t('pages.page.unpublish', { defaultValue: 'Dépublier' }) : t('pages.page.publish', { defaultValue: 'Publier' })}
           </button>
