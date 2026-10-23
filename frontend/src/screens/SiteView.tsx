@@ -12,7 +12,7 @@ import { PageStyle } from './PageStyle';
 import { SiteContext } from './SiteContext';
 
 /** Contenu d'une page : sa grille (lecture seule) ou, pour une page simple, son HTML assaini. */
-function PageBody({ page }: { page: Page }) {
+export function PageBody({ page }: { page: Page }) {
   return (
     <>
       <PageStyle sass={page.sass} />

@@ -147,12 +147,20 @@ public class PagesController extends MongoDbControllerHelper {
 
 	@Get("/p/website")
 	public void websiteView(final HttpServerRequest request) {
-		UserUtils.getUserInfos(eb, request, new io.vertx.core.Handler<UserInfos>() {
-			@Override
-			public void handle(UserInfos user) {
-				JsonObject context = new JsonObject().put("notLoggedIn", user == null);
-				renderView(request, context, "website.html", null);
+		// Site publié consulté avec ou sans connexion : même arbitrage d'interface que la bibliothèque (`?ui=`, préférence du
+		// compte, plateforme — un visiteur anonyme n'a que les deux premiers). La version React n'a besoin d'aucune session.
+		withPreferredUi(request, "angular".equals(this.config.getString("frontend-ui", "react")) ? "angular" : "react", ui -> {
+			if ("react".equals(ui)) {
+				renderView(request, new JsonObject(), "website-react.html", null);
+				return;
 			}
+			UserUtils.getUserInfos(eb, request, new io.vertx.core.Handler<UserInfos>() {
+				@Override
+				public void handle(UserInfos user) {
+					JsonObject context = new JsonObject().put("notLoggedIn", user == null);
+					renderView(request, context, "website.html", null);
+				}
+			});
 		});
 	}
 

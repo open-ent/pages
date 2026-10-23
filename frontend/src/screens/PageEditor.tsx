@@ -341,16 +341,20 @@ export function PageEditor() {
                     } else dropOn({ cellUid: cell._uid ?? '', side: e.clientX < box.left + box.width / 2 ? 'before' : 'after' });
                   }}
                 >
-                  <div className="d-flex gap-8 align-items-center mb-8 flex-wrap">
+                  <div
+                    className="d-flex gap-8 align-items-center mb-8 flex-wrap"
+                    data-cell-bar
+                    // Toute la barre d'outils de la cellule saisit la cellule (pas seulement la poignée) ; le texte de la cellule reste sélectionnable.
+                    draggable
+                    onDragStart={(e) => { e.dataTransfer.setData('text/plain', cell._uid ?? ''); e.dataTransfer.effectAllowed = 'move'; const uid = cell._uid ?? ''; setTimeout(() => setDrag({ kind: 'cell', uid }), 0); }}
+                    onDragEnd={() => { setDrag(null); setHover(null); }}
+                  >
                     <span
                       role="button"
                       tabIndex={0}
-                      draggable
                       aria-label={t('pages.editor.cell.drag', { defaultValue: 'Glisser la cellule pour la déplacer' })}
                       title={t('pages.editor.cell.drag', { defaultValue: 'Glisser la cellule pour la déplacer' })}
                       style={{ cursor: 'grab', userSelect: 'none' }}
-                      onDragStart={(e) => { e.dataTransfer.setData('text/plain', cell._uid ?? ''); e.dataTransfer.effectAllowed = 'move'; const uid = cell._uid ?? ''; setTimeout(() => setDrag({ kind: 'cell', uid }), 0); }}
-                      onDragEnd={() => { setDrag(null); setHover(null); }}
                       data-drag-handle
                     >⠿</span>
                     <button type="button" className="btn btn-link p-0" aria-label={t('pages.editor.cell.left', { defaultValue: 'Déplacer la cellule à gauche' })} disabled={c === 0} onClick={() => change(moveCell(grid, r, c, -1))}>←</button>
