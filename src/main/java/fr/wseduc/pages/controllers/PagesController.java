@@ -85,12 +85,58 @@ public class PagesController extends MongoDbControllerHelper {
 	@ApiDoc("Get page view")
 	@SecuredAction("pages.view")
 	public void view(HttpServerRequest request) {
+		withPreferredUi(request, "angular".equals(this.config.getString("frontend-ui", "react")) ? "angular" : "react", ui -> viewWith(request, ui));
+	}
+
+	/** Clé de préférence usager (« Paramètres du compte → Interfaces en cours de renouvellement ») portant le choix d'IHM. */
+	private static final String UI_PREFERENCE = "pagesUi";
+
+	/**
+	 * IHM à servir, par ordre de priorité : la dérogation d'URL {@code ?ui=react|angular} (non mémorisée), la préférence
+	 * de l'usager (clé {@code pagesUi}), puis celle de la plateforme. La préférence est lue à sa source, le nœud
+	 * {@code UserAppConf} du graphe ; aucune panne de cette lecture n'empêche le module de s'afficher.
+	 */
+	private void withPreferredUi(final HttpServerRequest request, final String platformUi, final io.vertx.core.Handler<String> handler) {
+		final String forced = request.getParam("ui");
+		if ("react".equals(forced) || "angular".equals(forced)) {
+			handler.handle(forced);
+			return;
+		}
+		org.entcore.common.user.UserUtils.getUserInfos(eb, request, user -> {
+			if (user == null) {
+				handler.handle(platformUi);
+				return;
+			}
+			final String query = "MATCH (:User {id:{userId}})-[:PREFERS]->(uac:UserAppConf) RETURN uac." + UI_PREFERENCE + " AS preference";
+			try {
+				org.entcore.common.neo4j.Neo4j.getInstance().execute(query, new JsonObject().put("userId", user.getUserId()),
+						message -> handler.handle(readUi(message.body(), platformUi)));
+			} catch (Exception e) {
+				// Graphe non initialisé pour ce module (`neo4j: false`) : la plateforme tranche, jamais d'erreur 500.
+				handler.handle(platformUi);
+			}
+		});
+	}
+
+	/** Extrait le choix d'IHM du résultat Neo4j — la préférence y est rangée en CHAÎNE JSON, ex. {"ui":"react"}. */
+	static String readUi(JsonObject body, String platformUi) {
+		try {
+			final io.vertx.core.json.JsonArray rows = body.getJsonArray("result", new io.vertx.core.json.JsonArray());
+			if (rows.isEmpty()) return platformUi;
+			final String raw = rows.getJsonObject(0).getString("preference");
+			if (raw == null || raw.trim().isEmpty()) return platformUi;
+			final String ui = new JsonObject(raw).getString("ui");
+			return ("react".equals(ui) || "angular".equals(ui)) ? ui : platformUi;
+		} catch (Exception e) {
+			// Préférence illisible ou graphe en échec : jamais d'erreur pour un choix d'habillage.
+			return platformUi;
+		}
+	}
+
+	private void viewWith(final HttpServerRequest request, final String ui) {
 		// IHM React (CCTP 51C — migration) : défaut React (parité : sites + pages CRUD + partage),
 		// override par `?ui=react|angular`. pages-react.html = nouvelle IHM React.
 		// NB : la génération springboard retire les clés de conf inconnues → c'est ce défaut Java qui pilote.
-		final String uiParam = request.params().get("ui");
-		final String frontendUi = "angular".equals(this.config.getString("frontend-ui", "react")) ? "angular" : "react";
-		final String ui = ("react".equals(uiParam) || "angular".equals(uiParam)) ? uiParam : frontendUi;
 		if ("react".equals(ui)) {
 			renderView(request, new io.vertx.core.json.JsonObject(), "pages-react.html", null);
 		} else {
