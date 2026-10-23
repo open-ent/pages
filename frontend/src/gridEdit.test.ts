@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { insertEmptyRow, locateCell, moveCellTo, resizedWidth, stripUids, addCell, addRow, moveCell, moveRow, normalizeEditRows, remainingColumns, removeCell, removeRow, rowsFromContent, setCellMedia, setCellWidth, insertEmptyCell } from './gridEdit';
+import type { EditRow } from './gridEdit';
 
 const grid = () => stripUids(normalizeEditRows([{ index: 0, cells: [{ index: 0, width: 8 }, { index: 1, width: 3 }] }, { index: 1, cells: [{ index: 0, width: 12 }] }]));
 

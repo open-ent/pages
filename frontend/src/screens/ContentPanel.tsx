@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Block, filterBlocks, loadBlockNames } from '../blocks';
+import { BlockPreview } from './BlockPreview';
 import { SNIPLET_KINDS, SnipletKind } from '../sniplets';
 
 /** Élément du panneau « Ajouter du contenu », à glisser vers la grille. */
@@ -52,7 +53,7 @@ export function ContentPanel({ onDragStart, onDragEnd }: { onDragStart: (item: P
     keywords: t(`blocks.${name}.keywords`, { defaultValue: '' }),
   }));
 
-  const chip = (item: PanelItem, label: string, extra?: string, icon?: string) => (
+  const chip = (item: PanelItem, label: string, extra?: string, icon?: string, preview?: ReactNode) => (
     <div
       key={JSON.stringify(item)}
       className="border rounded p-8 mb-8 bg-white"
@@ -65,6 +66,7 @@ export function ContentPanel({ onDragStart, onDragEnd }: { onDragStart: (item: P
       {icon && <span aria-hidden="true" className="me-8">{icon}</span>}
       <strong>{label}</strong>
       {extra && <span className="d-block text-muted" style={{ fontSize: 12 }}>{extra}</span>}
+      {preview}
     </div>
   );
 
@@ -98,7 +100,7 @@ export function ContentPanel({ onDragStart, onDragEnd }: { onDragStart: (item: P
       <input type="search" className="form-control form-control-sm mb-8" aria-label={t('blocks.search-block-style', { defaultValue: 'Rechercher un modèle' })} placeholder={t('blocks.search-block-style', { defaultValue: 'Rechercher un modèle' })} value={search} onChange={(e) => setSearch(e.target.value)} />
       {names.isError && <p className="text-danger" style={{ fontSize: 13 }}>{t('pages.block.error', { defaultValue: 'Les modèles ne sont pas disponibles.' })}</p>}
       <div style={{ maxHeight: 280, overflowY: 'auto' }}>
-        {filterBlocks(blocks, search).map((b) => chip({ kind: 'block', name: b.name }, b.title, b.description))}
+        {filterBlocks(blocks, search).map((b) => chip({ kind: 'block', name: b.name }, b.title, b.description, undefined, <BlockPreview name={b.name} />))}
       </div>
     </aside>
   );

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Block, filterBlocks, loadBlockHtml, loadBlockNames } from '../blocks';
+import { BlockPreview } from './BlockPreview';
 
 /** Choix d'un bloc modèle pour une cellule : recherche par titre ou mot-clé, puis insertion de son contenu. */
 export function BlockPicker({ onPick, onCancel }: { onPick: (html: string) => void; onCancel: () => void }) {
@@ -33,6 +34,7 @@ export function BlockPicker({ onPick, onCancel }: { onPick: (html: string) => vo
             <button type="button" className="btn btn-link p-0 text-start" onClick={() => pick(b.name)} data-block={b.name}>
               <strong>{b.title}</strong>
               {b.description && <span className="d-block text-muted" style={{ fontSize: 13 }}>{b.description}</span>}
+              <BlockPreview name={b.name} />
             </button>
           </li>
         ))}
