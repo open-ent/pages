@@ -149,7 +149,11 @@ public class PagesController extends MongoDbControllerHelper {
 	public void websiteView(final HttpServerRequest request) {
 		// Site publié consulté avec ou sans connexion : même arbitrage d'interface que la bibliothèque (`?ui=`, préférence du
 		// compte, plateforme — un visiteur anonyme n'a que les deux premiers). La version React n'a besoin d'aucune session.
-		withPreferredUi(request, "angular".equals(this.config.getString("frontend-ui", "react")) ? "angular" : "react", ui -> {
+		// Défaut propre au site public (`public-frontend-ui`), distinct de celui de la bibliothèque : un visiteur anonyme
+		// n'a ni préférence ni bouton de bascule, il prend ce défaut. Ex. frontend-ui: angular (plateforme encore en
+		// Angular pour les comptes) et public-frontend-ui: react → les sites publiés s'affichent en React.
+		final String publicUi = this.config.getString("public-frontend-ui", this.config.getString("frontend-ui", "react"));
+		withPreferredUi(request, "angular".equals(publicUi) ? "angular" : "react", ui -> {
 			if ("react".equals(ui)) {
 				renderView(request, new JsonObject(), "website-react.html", null);
 				return;
